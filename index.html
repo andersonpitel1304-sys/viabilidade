@@ -53,6 +53,14 @@
   #fila li { padding: 4px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; gap: 8px; }
   .oculto { display: none !important; }
   #flashTela { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  /* croqui */
+  #telaCroqui { padding: 0; background: #e9edf2; min-height: 100vh; }
+  #barraCroqui { position: sticky; top: 0; z-index: 5; background: #001A38; color: #fff; display: flex; gap: 6px; align-items: center; padding: 8px 10px; }
+  #barraCroqui b { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #barraCroqui button { font-size: 15px; padding: 6px 12px; }
+  #paginas { overflow: auto; padding: 6px; height: calc(100vh - 92px); -webkit-overflow-scrolling: touch; }
+  #paginas canvas { display: block; margin: 0 auto 8px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  #msgCroquiTela { padding: 10px 12px; }
   #aviso { position: fixed; left: 12px; right: 12px; bottom: 76px; background: #001A38; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 15px; z-index: 9; }
 </style>
 </head>
@@ -92,6 +100,11 @@
     <div class="perg"><label class="t">Circuito <span class="obrig">*</span></label><input id="novaCircuito" autocapitalize="characters" placeholder="Ex.: PIP 0114"></div>
     <div class="perg"><label class="t">Família da obra <span class="obrig">*</span></label><select id="novaFamilia"></select></div>
   </div>
+  <div class="card" id="cardCroqui">
+    <h3>Croqui</h3>
+    <div id="estadoCroqui" class="sub">Procurando…</div>
+    <div class="linha"><button class="prim" id="verCroqui" style="flex:1" disabled>Ver croqui</button><button id="atualizarCroqui" class="peq">Atualizar</button></div>
+  </div>
   <div class="card">
     <h3>1. Fotos por WL</h3>
     <div id="resumoFotos" class="sub"></div>
@@ -125,6 +138,13 @@
     <div class="sub" id="emPara"></div>
   </div>
   <div class="linha"><button class="prim" id="emAbrir" style="flex:1">Abrir no e-mail</button><button id="emCopiar" style="flex:1">Copiar texto</button></div>
+</div>
+
+<!-- CROQUI -->
+<div id="telaCroqui" class="oculto">
+  <div id="barraCroqui"><button id="voltarDoCroqui">‹ Obra</button><b id="tituloCroqui"></b><button id="zoomMenos" aria-label="Diminuir">−</button><button id="zoomMais" aria-label="Aumentar">+</button></div>
+  <div id="msgCroquiTela" class="sub"></div>
+  <div id="paginas"></div>
 </div>
 
 <!-- CÂMERA -->
@@ -181,11 +201,12 @@ for (var i = 1; i <= MAX_WL; i++) { var o = document.createElement('option'); o.
 // ---------- Banco do celular (IndexedDB): fotos e visitas esperando sinal ----------
 function abrirBanco() {
   return new Promise(function (ok, falha) {
-    var req = indexedDB.open('viabilidade', 2);
+    var req = indexedDB.open('viabilidade', 3);
     req.onupgradeneeded = function () {
       var b = req.result;
       if (!b.objectStoreNames.contains('fila')) b.createObjectStore('fila', { keyPath: 'idFoto' });
       if (!b.objectStoreNames.contains('visitas')) b.createObjectStore('visitas', { keyPath: 'idVisita' });
+      if (!b.objectStoreNames.contains('croquis')) b.createObjectStore('croquis', { keyPath: 'obra' });
     };
     req.onsuccess = function () { ok(req.result); };
     req.onerror = function () { falha(req.error); };
@@ -201,6 +222,7 @@ function tx(loja, modo, fn) {
 function todos(loja) { return tx(loja, 'readonly', function (s) { return s.getAll(); }); }
 function por(loja, item) { return tx(loja, 'readwrite', function (s) { s.put(item); }); }
 function tirar(loja, id) { return tx(loja, 'readwrite', function (s) { s.delete(id); }); }
+function pegar(loja, id) { return tx(loja, 'readonly', function (s) { return s.get(id); }); }
 
 // ---------- Servidor ----------
 function chamar(corpo) {
@@ -231,9 +253,10 @@ $('sairLogin').onclick = function () {
 };
 
 function telas(qual) {
-  ['telaSenha', 'telaObras', 'telaObra', 'telaEmail', 'telaCamera'].forEach(function (t) { mostrar(t, t === qual); });
+  ['telaSenha', 'telaObras', 'telaObra', 'telaEmail', 'telaCamera', 'telaCroqui'].forEach(function (t) { mostrar(t, t === qual); });
   mostrar('barraFixa', qual === 'telaObra');
-  mostrar('usuario', qual !== 'telaSenha' && qual !== 'telaCamera');
+  mostrar('usuario', qual !== 'telaSenha' && qual !== 'telaCamera' && qual !== 'telaCroqui');
+  if (qual !== 'telaCroqui') fecharCroqui();
   window.scrollTo(0, 0);
 }
 function telaInicial() {
@@ -251,6 +274,7 @@ function carregarInicio() {
     INI = r; guardadoJ('inicio', r);
     $('msgObras').textContent = 'Atualizado às ' + new Date().toTimeString().slice(0, 5);
     desenharObras();
+    preBaixarCroquis();
   }).catch(function (e) {
     $('msgObras').textContent = INI ? 'Sem sinal: mostrando a lista guardada.' : 'Sem sinal e sem lista guardada.';
   });
@@ -268,6 +292,8 @@ function itemObra(o, feita) {
   var r = guardadoJ('rasc_' + normObra(o.obra)), loc = guardadoJ('concl_' + normObra(o.obra));
   if (loc) d.appendChild(el('span', 'pill verde', 'concluída no celular ' + br(loc)));
   else if (r) d.appendChild(el('span', 'pill amarela', 'em andamento'));
+  var cq = CROQ[normObra(o.obra)];
+  if (cq) { d.appendChild(document.createTextNode(' ')); d.appendChild(el('span', 'pill' + (o.croquiChave && o.croquiChave !== cq ? ' amarela' : ' verde'), o.croquiChave && o.croquiChave !== cq ? 'croqui desatualizado' : 'croqui ✓')); }
   if (feita) { var v = new Date(o.dataViab + 'T12:00:00'); v.setDate(v.getDate() + 45); d.appendChild(el('span', 'pill', 'viabilidade ' + br(o.dataViab) + ' · Pré-APR até ' + br(dataISO(v)))); }
   d.onclick = function () { abrirObra(o.obra, o); };
   return d;
@@ -314,6 +340,7 @@ function abrirObra(numero, dados) {
   desenharInfo(); desenharChecklist(); desenharLocal(); resumoFotos();
   $('msgObra').textContent = '';
   telas('telaObra');
+  desenharCroqui(true);
 }
 function salvarRasc() { if (OBRA) guardadoJ('rasc_' + OBRA.norm, RASC); }
 function desenharInfo() {
@@ -461,6 +488,164 @@ $('emCopiar').onclick = function () {
     $('emCorpo').select(); document.execCommand('copy'); aviso('Texto copiado.');
   });
 };
+
+// ---------- Croqui (só visualização; guardado no celular para abrir sem sinal) ----------
+var CROQ = {};            // obra normalizada → chave do croqui guardado no celular
+var baixandoCroqui = {};  // obra → promessa em andamento
+var situacaoCroqui = {};  // obra → 'nenhum' | 'mesma' | 'novo' | 'sem sinal' | 'erro: …' (última consulta)
+var preBaixando = false;
+function carregarIndiceCroquis() {
+  return todos('croquis').then(function (l) { CROQ = {}; l.forEach(function (c) { CROQ[c.obra] = c.chave; }); });
+}
+function b64ParaBlob(b64, tipo) {
+  var s = atob(b64), n = s.length, a = new Uint8Array(n);
+  for (var i = 0; i < n; i++) a[i] = s.charCodeAt(i);
+  return new Blob([a], { type: tipo });
+}
+function kb(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+// Pergunta ao servidor; só baixa se a chave (versão) mudou.
+function baixarCroqui(norm, obraTexto) {
+  if (baixandoCroqui[norm]) return baixandoCroqui[norm];
+  var p = chamar({ acao: 'croqui', obra: obraTexto || norm, chave: CROQ[norm] || '' }).then(function (r) {
+    if (!r.ok) { if (r.erro === 'Senha inválida') deslogar(); throw { servidor: r.erro }; }
+    if (r.mesma) return 'mesma';
+    if (!r.croqui) return 'nenhum';
+    var blob = b64ParaBlob(r.croqui.base64, 'application/pdf');
+    return por('croquis', { obra: norm, chave: r.croqui.chave, nome: r.croqui.nome, blob: blob, tamanho: blob.size, baixado: Date.now() })
+      .then(function () { CROQ[norm] = r.croqui.chave; return 'novo'; });
+  }).then(function (s) { situacaoCroqui[norm] = s; delete baixandoCroqui[norm]; return s; },
+          function (e) { situacaoCroqui[norm] = e && e.servidor ? 'erro: ' + e.servidor : 'sem sinal'; delete baixandoCroqui[norm]; throw e; });
+  baixandoCroqui[norm] = p;
+  return p;
+}
+function desenharCroqui(conferir) {
+  if (!OBRA || !db) return;
+  var norm = OBRA.norm, obraTexto = OBRA.obra;
+  pegar('croquis', norm).then(function (c) {
+    if (!OBRA || OBRA.norm !== norm) return;
+    var s = situacaoCroqui[norm], t, cls = 'sub';
+    if (c) { t = 'Guardado no celular: ' + c.nome + ' (' + kb(c.tamanho || (c.blob && c.blob.size) || 0) + '), baixado em ' + dataHora(new Date(c.baixado)).slice(0, 16) + '.'; cls = 'ok'; }
+    else t = 'Nenhum croqui guardado no celular.';
+    if (baixandoCroqui[norm]) t += ' Conferindo se há versão nova…';
+    else if (s === 'nenhum') { t += c ? ' (não está mais no Drive; mostrando a cópia guardada)' : ' Ainda não há croqui no Drive para esta obra. Ele chega pela ponte do PC da Secretaria.'; if (!c) cls = 'alerta'; }
+    else if (s === 'novo') t += ' Versão nova baixada agora.';
+    else if (s === 'mesma') t += ' É a versão mais recente.';
+    else if (s === 'sem sinal') t += c ? ' Sem sinal: usando a cópia guardada.' : ' Sem sinal para baixar.';
+    else if (s) { t += ' ' + s; cls = 'erro'; }
+    $('estadoCroqui').textContent = t; $('estadoCroqui').className = cls;
+    $('verCroqui').disabled = !c;
+    if (conferir && !baixandoCroqui[norm]) {
+      var pr = baixarCroqui(norm, obraTexto);
+      desenharCroqui(false);
+      pr.then(function () { desenharCroqui(false); }, function () { desenharCroqui(false); });
+    }
+  });
+}
+$('atualizarCroqui').onclick = function () { desenharCroqui(true); };
+// Com sinal, ao carregar "Minhas obras": baixa os croquis das pendentes que mudaram. Um por vez.
+function preBaixarCroquis() {
+  if (preBaixando || !db || !INI) return;
+  var obras = INI.obras.pendentes.filter(function (o) { return o.croquiChave && CROQ[normObra(o.obra)] !== o.croquiChave; });
+  preBaixando = true;
+  obras.reduce(function (cadeia, o) {
+    return cadeia.then(function (parar) {
+      if (parar) return true;
+      return baixarCroqui(normObra(o.obra), o.obra).then(function () { return false; }, function (e) { return !(e && e.servidor); });
+    });
+  }, Promise.resolve(false)).then(function () {
+    // limpeza: croqui de obra que saiu das listas e foi baixado há mais de 30 dias
+    var nas = {}; INI.obras.pendentes.concat(INI.obras.feitas).forEach(function (o) { nas[normObra(o.obra)] = 1; });
+    return todos('croquis').then(function (l) {
+      return Promise.all(l.filter(function (c) { return !nas[c.obra] && Date.now() - c.baixado > 30 * 864e5; })
+        .map(function (c) { delete CROQ[c.obra]; return tirar('croquis', c.obra); }));
+    });
+  }).then(function () { preBaixando = false; if (!$('telaObras').classList.contains('oculto')) desenharObras(); },
+          function () { preBaixando = false; });
+}
+
+// Leitor: pdf.js desenha as páginas em canvas (o Chrome do Android não mostra PDF dentro da página).
+var PDFDOC = null, ZOOM = 1, ZOOMS = [1, 1.5, 2, 3, 4], rodadaCroqui = 0;
+function carregarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (carregarPdfJs.p) return carregarPdfJs.p;
+  carregarPdfJs.p = new Promise(function (ok, falha) {
+    var s = document.createElement('script'); s.src = 'pdf.min.js';
+    s.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js'; ok(window.pdfjsLib); };
+    s.onerror = function () { carregarPdfJs.p = null; falha(new Error('o leitor de PDF não carregou')); };
+    document.head.appendChild(s);
+  });
+  return carregarPdfJs.p;
+}
+function lerBlob(b) { return b.arrayBuffer ? b.arrayBuffer() : new Promise(function (ok) { var l = new FileReader(); l.onload = function () { ok(l.result); }; l.readAsArrayBuffer(b); }); }
+$('verCroqui').onclick = function () {
+  if (!OBRA) return;
+  var norm = OBRA.norm;
+  pegar('croquis', norm).then(function (c) {
+    if (!c) { aviso('Croqui não guardado no celular.'); return; }
+    telas('telaCroqui');
+    $('tituloCroqui').textContent = c.nome;
+    $('msgCroquiTela').textContent = 'Abrindo…'; $('msgCroquiTela').className = 'sub';
+    var rodada = ++rodadaCroqui;
+    Promise.all([carregarPdfJs(), lerBlob(c.blob)]).then(function (r) {
+      return r[0].getDocument({ data: new Uint8Array(r[1]), isEvalSupported: false }).promise;
+    }).then(function (doc) {
+      if (rodada !== rodadaCroqui) { doc.destroy(); return; }
+      PDFDOC = doc; ZOOM = 1; desenharPaginas();
+    }).catch(function (e) {
+      if (rodada !== rodadaCroqui) return;
+      $('msgCroquiTela').textContent = 'Não consegui abrir o croqui: ' + (e && e.message || e); $('msgCroquiTela').className = 'erro';
+    });
+  });
+};
+function desenharPaginas() {
+  if (!PDFDOC) return;
+  var doc = PDFDOC, rodada = ++rodadaCroqui, box = $('paginas');
+  var cx = box.scrollWidth ? (box.scrollLeft + box.clientWidth / 2) / box.scrollWidth : 0.5;
+  var cy = box.scrollHeight ? (box.scrollTop + box.clientHeight / 2) / box.scrollHeight : 0;
+  var largura = Math.max(200, box.clientWidth - 12), dpr = Math.min(window.devicePixelRatio || 1, 3);
+  var nums = []; for (var i = 1; i <= doc.numPages; i++) nums.push(i);
+  Promise.all(nums.map(function (n) { return doc.getPage(n); })).then(function (pags) {
+    if (rodada !== rodadaCroqui) return;
+    box.innerHTML = '';
+    var itens = pags.map(function (pg) {
+      var v1 = pg.getViewport({ scale: 1 }), esc = largura * ZOOM / v1.width;
+      var vp = pg.getViewport({ scale: esc * dpr });
+      // limite de memória do celular: lado ≤ 4096 px e área ≤ 8 milhões de pixels por página
+      var f = Math.min(1, 4096 / vp.width, 4096 / vp.height, Math.sqrt(8e6 / (vp.width * vp.height)));
+      if (f < 1) vp = pg.getViewport({ scale: esc * dpr * f });
+      var cv = document.createElement('canvas');
+      cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+      cv.style.width = Math.round(v1.width * esc) + 'px'; cv.style.height = Math.round(v1.height * esc) + 'px';
+      box.appendChild(cv);
+      return { pg: pg, vp: vp, cv: cv };
+    });
+    box.scrollLeft = cx * box.scrollWidth - box.clientWidth / 2;
+    box.scrollTop = cy * box.scrollHeight - box.clientHeight / 2;
+    $('msgCroquiTela').textContent = doc.numPages + ' página(s) · zoom ' + String(ZOOM).replace('.', ',') + '×'; $('msgCroquiTela').className = 'sub';
+    return itens.reduce(function (cadeia, it) {
+      return cadeia.then(function () {
+        if (rodada !== rodadaCroqui) return;
+        return it.pg.render({ canvasContext: it.cv.getContext('2d'), viewport: it.vp }).promise;
+      });
+    }, Promise.resolve());
+  }).catch(function (e) {
+    if (rodada !== rodadaCroqui) return;
+    $('msgCroquiTela').textContent = 'Erro ao desenhar: ' + (e && e.message || e); $('msgCroquiTela').className = 'erro';
+  });
+}
+function mudarZoom(passo) {
+  var i = ZOOMS.indexOf(ZOOM) + passo;
+  if (i < 0 || i >= ZOOMS.length || !PDFDOC) return;
+  ZOOM = ZOOMS[i]; desenharPaginas();
+}
+$('zoomMais').onclick = function () { mudarZoom(1); };
+$('zoomMenos').onclick = function () { mudarZoom(-1); };
+$('voltarDoCroqui').onclick = function () { telas('telaObra'); };
+function fecharCroqui() {
+  rodadaCroqui++;
+  if (PDFDOC) { PDFDOC.destroy(); PDFDOC = null; }
+  var box = $('paginas'); if (box) box.innerHTML = '';
+}
 
 // ---------- Câmera ----------
 $('abrirCamera').onclick = function () { abrirCamera(); };
@@ -642,6 +827,7 @@ setInterval(enviarTudo, 30000);
 INI = guardadoJ('inicio');
 abrirBanco().then(function (b) {
   db = b; telaInicial(); desenharFila();
+  carregarIndiceCroquis().then(function () { if (!$('telaObras').classList.contains('oculto')) desenharObras(); });
   if (guardado('token')) { carregarInicio(); ultimaCarga = Date.now(); }
   enviarTudo();
 }).catch(function (e) { aviso('Erro no armazenamento do celular: ' + e); });
