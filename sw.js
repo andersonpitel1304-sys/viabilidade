@@ -1,5 +1,5 @@
 // Guarda a tela no celular para abrir mesmo sem sinal.
-var VERSAO = 'viab-v1';
+var VERSAO = 'viab-v2';
 var ARQUIVOS = ['./', 'index.html', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png'];
 
 self.addEventListener('install', function (e) {
