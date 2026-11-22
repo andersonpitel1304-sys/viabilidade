@@ -1,6 +1,6 @@
 {
-  "name": "Secretaria Técnica – Alpitel",
-  "short_name": "Secretaria Técnica",
+  "name": "ST – Secretaria Técnica",
+  "short_name": "ST",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
