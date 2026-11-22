@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#003b71">
+<title>Viabilidade – Câmera</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone-192.png">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, sans-serif; background: #111; color: #fff; }
+  header { background: #fff; color: #003b71; padding: 8px 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+  header small { color: #555; font-weight: normal; }
+  .linha { display: flex; gap: 8px; padding: 8px 12px; align-items: center; }
+  input, select, button { font-size: 18px; padding: 10px; border-radius: 8px; border: 1px solid #444; }
+  input, select { flex: 1; min-width: 0; background: #222; color: #fff; }
+  button { background: #333; color: #fff; }
+  button.prim { background: #0a6ebd; border-color: #0a6ebd; }
+  #video { width: 100%; max-height: 58vh; background: #000; display: block; }
+  #gps, #status { padding: 6px 12px; font-size: 15px; }
+  .ok { color: #6fdc8c; } .alerta { color: #ffcc4d; } .erro { color: #ff7b7b; }
+  #disparo { width: 84px; height: 84px; border-radius: 50%; border: 6px solid #fff; background: #d33; font-size: 0; }
+  #disparo:disabled { background: #555; }
+  #barra { display: flex; justify-content: space-around; align-items: center; padding: 10px; }
+  #fila { list-style: none; margin: 0; padding: 0 12px 20px; font-size: 14px; }
+  #fila li { padding: 4px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
+  .oculto { display: none !important; }
+  #flashTela { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .15s; }
+</style>
+</head>
+<body>
+<header><span>ALPITEL ENERGY</span><small>Viabilidade – câmera</small></header>
+
+<div id="telaSenha" class="oculto">
+  <div class="linha"><input id="senha" placeholder="Senha do app" autocapitalize="characters" autocomplete="off"></div>
+  <div class="linha"><button class="prim" id="salvarSenha">Entrar</button></div>
+  <div id="msgSenha" class="linha erro"></div>
+</div>
+
+<div id="config" class="oculto">
+  <div class="linha"><input id="obra" placeholder="Nº do projeto (ex.: DACASUL2501427)" autocapitalize="characters"></div>
+  <div class="linha"><select id="wl"></select><button class="prim" id="iniciar">Iniciar</button></div>
+</div>
+
+<div id="camera" class="oculto">
+  <div class="linha" style="justify-content:space-between">
+    <b id="titulo"></b><button id="sair">Voltar</button>
+  </div>
+  <video id="video" autoplay playsinline muted></video>
+  <div id="gps" class="alerta">GPS: procurando sinal…</div>
+  <div id="barra">
+    <button id="flash" style="visibility:hidden">Flash</button>
+    <button id="disparo" disabled aria-label="Fotografar">foto</button>
+    <button id="proxima">Próxima WL ›</button>
+  </div>
+</div>
+
+<div id="status" class="alerta"></div>
+<ul id="fila"></ul>
+<canvas id="tela" class="oculto"></canvas>
+<div id="flashTela"></div>
+
+<script>
+// Endereço do servidor (Apps Script). Não é segredo; a senha fica só no celular.
+var SERVIDOR = 'https://script.google.com/macros/s/AKfycbz8hmbLMHaEJj7Secv24elyApKVqVyBFqDzCiaI7iE1ckiFRSueBUvV5X5NlD265V-Y/exec';
+var MAX_WL = 40, LADO_MAX = 4000, PRECISAO_ALERTA = 30, QUALIDADE = 0.9;
+
+var stream = null, captura = null, pos = null, vigia = null, flashLigado = false;
+var enviando = false, db = null;
+var $ = function (id) { return document.getElementById(id); };
+function mostrar(id, sim) { $(id).classList.toggle('oculto', !sim); }
+
+for (var i = 1; i <= MAX_WL; i++) {
+  var o = document.createElement('option');
+  o.value = o.textContent = 'WL' + ('0' + i).slice(-2);
+  $('wl').appendChild(o);
+}
+
+function guardado(k, v) {
+  try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
+}
+function dois(n) { return ('0' + n).slice(-2); }
+function dataHora(d) {
+  return dois(d.getDate()) + '/' + dois(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' +
+         dois(d.getHours()) + ':' + dois(d.getMinutes()) + ':' + dois(d.getSeconds());
+}
+function obraAtual() { return $('obra').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+// ---------- Fila guardada no celular (IndexedDB) ----------
+function abrirBanco() {
+  return new Promise(function (ok, falha) {
+    var req = indexedDB.open('viabilidade', 1);
+    req.onupgradeneeded = function () { req.result.createObjectStore('fila', { keyPath: 'idFoto' }); };
+    req.onsuccess = function () { ok(req.result); };
+    req.onerror = function () { falha(req.error); };
+  });
+}
+function tx(modo, fn) {
+  return new Promise(function (ok, falha) {
+    var t = db.transaction('fila', modo), s = t.objectStore('fila'), r = fn(s);
+    t.oncomplete = function () { ok(r && r.result); };
+    t.onerror = function () { falha(t.error); };
+  });
+}
+function filaTodos() { return tx('readonly', function (s) { return s.getAll(); }); }
+function filaPor(item) { return tx('readwrite', function (s) { s.put(item); }); }
+function filaTirar(id) { return tx('readwrite', function (s) { s.delete(id); }); }
+
+// ---------- Senha ----------
+$('salvarSenha').onclick = function () {
+  var s = $('senha').value.trim().toUpperCase();
+  if (!s) return;
+  $('msgSenha').textContent = 'Conferindo…';
+  chamar({ acao: 'ping', token: s }).then(function (r) {
+    if (r.ok) { guardado('token', s); $('msgSenha').textContent = ''; telaInicial(); }
+    else $('msgSenha').textContent = r.erro || 'Senha não aceita.';
+  }).catch(function () {
+    // Sem sinal: aceita e confere no primeiro envio.
+    guardado('token', s); telaInicial();
+  });
+};
+
+function telaInicial() {
+  var temSenha = !!guardado('token');
+  mostrar('telaSenha', !temSenha);
+  mostrar('config', temSenha);
+  mostrar('camera', false);
+  if (guardado('obra')) $('obra').value = guardado('obra');
+}
+
+// ---------- Câmera ----------
+$('iniciar').onclick = function () {
+  if (!obraAtual()) { $('status').textContent = 'Digite o número do projeto.'; $('status').className = 'erro'; return; }
+  $('obra').value = obraAtual();
+  guardado('obra', obraAtual());
+  abrirCamera();
+};
+$('sair').onclick = fecharCamera;
+$('proxima').onclick = function () {
+  var s = $('wl');
+  if (s.selectedIndex < s.options.length - 1) s.selectedIndex++;
+  atualizarTitulo();
+};
+$('disparo').onclick = fotografar;
+$('flash').onclick = function () {
+  flashLigado = !flashLigado;
+  stream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: flashLigado }] }).catch(function () {});
+  $('flash').textContent = flashLigado ? 'Flash ON' : 'Flash';
+};
+function atualizarTitulo() { $('titulo').textContent = obraAtual() + ' · ' + $('wl').value; }
+
+function abrirCamera() {
+  navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } }
+  }).then(function (s) {
+    stream = s;
+    $('video').srcObject = s;
+    mostrar('config', false); mostrar('camera', true);
+    atualizarTitulo();
+    var trilha = s.getVideoTracks()[0];
+    captura = null;
+    if (window.ImageCapture) { try { captura = new ImageCapture(trilha); } catch (e) {} }
+    var cap = trilha.getCapabilities ? trilha.getCapabilities() : {};
+    $('flash').style.visibility = cap.torch ? 'visible' : 'hidden';
+    iniciarGps();
+  }).catch(function (e) {
+    $('status').textContent = 'Câmera bloqueada (' + e.name + '). Libere a câmera para este site nas configurações do Chrome.';
+    $('status').className = 'erro';
+  });
+}
+
+function fecharCamera() {
+  if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+  if (vigia !== null) navigator.geolocation.clearWatch(vigia);
+  stream = null; vigia = null; pos = null; flashLigado = false;
+  $('disparo').disabled = true;
+  mostrar('camera', false); mostrar('config', true);
+}
+
+function iniciarGps() {
+  if (!navigator.geolocation) { gpsMsg('Este navegador não tem GPS.', 'erro'); return; }
+  vigia = navigator.geolocation.watchPosition(function (p) {
+    pos = p;
+    var prec = Math.round(p.coords.accuracy);
+    gpsMsg('GPS ±' + prec + ' m · ' + p.coords.latitude.toFixed(6) + ', ' + p.coords.longitude.toFixed(6) +
+      (prec > PRECISAO_ALERTA ? ' (precisão baixa)' : ''), prec <= PRECISAO_ALERTA ? 'ok' : 'alerta');
+    $('disparo').disabled = false;
+  }, function (e) {
+    gpsMsg('GPS: ' + (e.code === 1 ? 'permissão negada. Libere a localização.' : 'sem sinal (' + e.message + ')'), 'erro');
+  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+}
+function gpsMsg(t, c) { $('gps').textContent = t; $('gps').className = c; }
+
+function obterImagem() {
+  if (captura) {
+    return captura.takePhoto().then(function (b) { return createImageBitmap(b); })
+      .catch(function () { return createImageBitmap($('video')); });
+  }
+  return createImageBitmap($('video'));
+}
+
+function fotografar() {
+  if (!pos) return;
+  var p = pos, agora = new Date(), wl = $('wl').value, obra = obraAtual();
+  $('disparo').disabled = true;
+  $('flashTela').style.opacity = 0.7; setTimeout(function () { $('flashTela').style.opacity = 0; }, 120);
+  obterImagem().then(function (img) {
+    var esc = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+    var w = Math.round(img.width * esc), h = Math.round(img.height * esc);
+    var c = $('tela'); c.width = w; c.height = h;
+    var g = c.getContext('2d');
+    g.drawImage(img, 0, 0, w, h);
+    carimbar(g, w, h, [
+      dataHora(agora),
+      'Lat ' + p.coords.latitude.toFixed(6) + '  Long ' + p.coords.longitude.toFixed(6) + '  ±' + Math.round(p.coords.accuracy) + ' m',
+      obra + '  ·  ' + wl
+    ]);
+    return new Promise(function (ok) { c.toBlob(ok, 'image/jpeg', QUALIDADE); });
+  }).then(function (blob) {
+    var item = {
+      idFoto: obra + '-' + agora.getTime() + '-' + Math.random().toString(36).slice(2, 7),
+      obra: obra, wl: wl, blob: blob,
+      lat: p.coords.latitude, lng: p.coords.longitude, prec: Math.round(p.coords.accuracy),
+      horaCel: dataHora(agora), criado: agora.getTime()
+    };
+    return filaPor(item);
+  }).then(function () {
+    $('disparo').disabled = false;
+    desenharFila(); enviarFila();
+  }).catch(function (e) {
+    $('status').textContent = 'Erro ao fotografar: ' + e; $('status').className = 'erro';
+    $('disparo').disabled = false;
+  });
+}
+
+function carimbar(g, w, h, linhas) {
+  var fonte = Math.max(18, Math.round(w / 38));
+  var alt = fonte * 1.35, pad = Math.round(fonte * 0.6);
+  var caixa = linhas.length * alt + pad * 2;
+  g.fillStyle = 'rgba(0,0,0,0.55)';
+  g.fillRect(0, h - caixa, w, caixa);
+  g.fillStyle = '#ffffff';
+  g.font = 'bold ' + fonte + 'px Arial, sans-serif';
+  g.textBaseline = 'top';
+  linhas.forEach(function (t, i) { g.fillText(t, pad, h - caixa + pad + i * alt); });
+}
+
+// ---------- Envio ----------
+var enviadas = [];
+function chamar(corpo) {
+  return fetch(SERVIDOR, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(corpo)
+  }).then(function (r) { return r.json(); });
+}
+function paraBase64(blob) {
+  return new Promise(function (ok) {
+    var l = new FileReader();
+    l.onload = function () { ok(l.result.split(',')[1]); };
+    l.readAsDataURL(blob);
+  });
+}
+
+function desenharFila() {
+  return filaTodos().then(function (itens) {
+    var ul = $('fila'); ul.innerHTML = '';
+    itens.sort(function (a, b) { return b.criado - a.criado; }).forEach(function (it) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span>' + it.wl + ' · ' + it.horaCel.slice(11) + ' · ' + (it.blob.size / 1048576).toFixed(1) +
+        ' MB</span><span class="' + (it.erro ? 'erro' : 'alerta') + '">' + (it.erro || 'no celular, aguardando envio') + '</span>';
+      ul.appendChild(li);
+    });
+    enviadas.slice(-15).reverse().forEach(function (n) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span>' + n + '</span><span class="ok">no Drive ✓</span>';
+      ul.appendChild(li);
+    });
+    var st = $('status');
+    if (itens.length) { st.textContent = itens.length + ' foto(s) guardada(s) no celular, aguardando envio.'; st.className = 'alerta'; }
+    else { st.textContent = 'Todas as fotos enviadas.'; st.className = 'ok'; }
+    return itens;
+  });
+}
+
+function enviarFila() {
+  if (enviando || !db) return;
+  var token = guardado('token');
+  if (!token) return;
+  enviando = true;
+  filaTodos().then(function (itens) {
+    itens.sort(function (a, b) { return a.criado - b.criado; });
+    return itens.reduce(function (cadeia, it) {
+      return cadeia.then(function (parar) {
+        if (parar) return true;
+        return paraBase64(it.blob).then(function (b64) {
+          return chamar({
+            acao: 'foto', token: token, obra: it.obra, wl: it.wl, base64: b64,
+            lat: it.lat, lng: it.lng, prec: it.prec, horaCel: it.horaCel, idFoto: it.idFoto
+          });
+        }).then(function (r) {
+          if (r.ok) { enviadas.push(r.nome); return filaTirar(it.idFoto).then(function () { return false; }); }
+          if (r.erro === 'Senha inválida') { localStorage.removeItem('token'); telaInicial(); $('msgSenha').textContent = 'Senha recusada pelo servidor. Digite de novo.'; return true; }
+          it.erro = 'erro: ' + r.erro;
+          return filaPor(it).then(function () { return false; });
+        }, function () {
+          return true; // sem sinal: tenta mais tarde
+        });
+      });
+    }, Promise.resolve(false));
+  }).then(function () {
+    enviando = false; desenharFila();
+  }, function () { enviando = false; });
+}
+
+window.addEventListener('online', enviarFila);
+setInterval(enviarFila, 30000);
+
+abrirBanco().then(function (b) { db = b; telaInicial(); desenharFila(); enviarFila(); })
+  .catch(function (e) { $('status').textContent = 'Erro no armazenamento do celular: ' + e; $('status').className = 'erro'; });
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+</script>
+</body>
+</html>
