@@ -1,12 +1,12 @@
 {
-  "name": "Viabilidade – Alpitel",
-  "short_name": "Viabilidade",
+  "name": "Secretaria Técnica – Alpitel",
+  "short_name": "Secretaria Técnica",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#111111",
-  "theme_color": "#003b71",
+  "background_color": "#f2f4f7",
+  "theme_color": "#001A38",
   "icons": [
     { "src": "icone-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icone-512.png", "sizes": "512x512", "type": "image/png" }

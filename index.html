@@ -3,53 +3,136 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="theme-color" content="#003b71">
-<title>Viabilidade – Câmera</title>
+<meta name="theme-color" content="#001A38">
+<title>Secretaria Técnica – Alpitel</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone-192.png">
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: Arial, sans-serif; background: #111; color: #fff; }
-  header { background: #fff; color: #003b71; padding: 8px 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-  header small { color: #555; font-weight: normal; }
-  #usuario { padding: 6px 12px; font-size: 14px; color: #bbb; display: flex; justify-content: space-between; align-items: center; }
-  #usuario button { font-size: 14px; padding: 4px 10px; }
-  .linha { display: flex; gap: 8px; padding: 8px 12px; align-items: center; }
-  input, select, button { font-size: 18px; padding: 10px; border-radius: 8px; border: 1px solid #444; }
-  input, select { flex: 1; min-width: 0; background: #222; color: #fff; }
-  button { background: #333; color: #fff; }
-  button.prim { background: #0a6ebd; border-color: #0a6ebd; }
+  body { margin: 0; font-family: Arial, sans-serif; background: #f2f4f7; color: #1b2430; }
+  header { background: #001A38; color: #fff; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+  header b { letter-spacing: 1px; } header b span { color: #FFC20E; }
+  header small { color: #c9d3df; font-size: 12px; }
+  #usuario { padding: 6px 14px; font-size: 13px; color: #556; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #dde3ea; }
+  .tela { padding: 10px 12px 90px; }
+  .linha { display: flex; gap: 8px; margin: 8px 0; align-items: center; }
+  input, select, textarea, button { font-size: 17px; padding: 10px; border-radius: 8px; border: 1px solid #c4ccd6; font-family: inherit; }
+  input, select, textarea { flex: 1; min-width: 0; background: #fff; color: #1b2430; width: 100%; }
+  textarea { min-height: 70px; }
+  button { background: #fff; color: #001A38; border-color: #9fb0c4; }
+  button.prim { background: #001A38; color: #fff; border-color: #001A38; }
+  button.amar { background: #FFC20E; color: #001A38; border-color: #FFC20E; font-weight: bold; }
+  button.peq { font-size: 14px; padding: 6px 10px; }
+  .card { background: #fff; border: 1px solid #dde3ea; border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+  .card h3 { margin: 0 0 6px; font-size: 15px; color: #001A38; }
+  .obraItem { cursor: pointer; }
+  .obraItem b { color: #001A38; }
+  .sub { color: #667; font-size: 13px; }
+  .ok { color: #16884A; } .alerta { color: #b07800; } .erro { color: #c62828; }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #e8edf3; color: #334; }
+  .pill.verde { background: #e3f4ea; color: #16884A; } .pill.amarela { background: #fff4d1; color: #8a6100; }
+  .perg { margin: 10px 0; } .perg label.t { display: block; font-weight: bold; margin-bottom: 4px; font-size: 15px; }
+  .opcs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opcs button { font-size: 15px; padding: 8px 12px; }
+  .opcs button.sel { background: #001A38; color: #fff; }
+  .obrig { color: #c62828; }
+  #barraFixa { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #dde3ea; padding: 8px 12px; display: flex; gap: 8px; }
+  #barraFixa button { flex: 1; }
+  /* câmera */
+  #telaCamera { background: #111; color: #fff; padding: 0; min-height: 100vh; }
+  #telaCamera .linha { padding: 8px 12px; margin: 0; }
   #video { width: 100%; max-height: 58vh; background: #000; display: block; }
-  #gps, #status { padding: 6px 12px; font-size: 15px; }
-  .ok { color: #6fdc8c; } .alerta { color: #ffcc4d; } .erro { color: #ff7b7b; }
-  #disparo { width: 84px; height: 84px; border-radius: 50%; border: 6px solid #fff; background: #d33; font-size: 0; }
-  #disparo:disabled { background: #555; }
+  #gps { padding: 6px 12px; font-size: 15px; }
+  #telaCamera .ok { color: #6fdc8c; } #telaCamera .alerta { color: #ffcc4d; } #telaCamera .erro { color: #ff7b7b; }
+  #telaCamera select { background: #222; color: #fff; border-color: #444; }
+  #telaCamera button { background: #333; color: #fff; border-color: #444; }
+  #disparo { width: 84px; height: 84px; border-radius: 50% !important; border: 6px solid #fff !important; background: #d33 !important; font-size: 0; }
+  #disparo:disabled { background: #555 !important; }
   #barra { display: flex; justify-content: space-around; align-items: center; padding: 10px; }
   #fila { list-style: none; margin: 0; padding: 0 12px 20px; font-size: 14px; }
   #fila li { padding: 4px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; gap: 8px; }
   .oculto { display: none !important; }
   #flashTela { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  #aviso { position: fixed; left: 12px; right: 12px; bottom: 76px; background: #001A38; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 15px; z-index: 9; }
 </style>
 </head>
 <body>
-<header><span>ALPITEL ENERGY</span><small>Viabilidade – câmera</small></header>
-<div id="usuario" class="oculto"><span id="nomeUsuario"></span><button id="sairLogin">Sair</button></div>
+<header><b>ALPI<span>T</span>EL</b><small>Secretaria Técnica</small></header>
+<div id="usuario" class="oculto"><span id="nomeUsuario"></span><span><span id="sinc" class="sub"></span> <button id="sairLogin" class="peq">Sair</button></span></div>
 
-<div id="telaSenha" class="oculto">
-  <div class="linha"><input id="senha" placeholder="Sua senha de viabilizador" autocapitalize="characters" autocomplete="off"></div>
-  <div class="linha"><button class="prim" id="salvarSenha">Entrar</button></div>
-  <div id="msgSenha" class="linha erro"></div>
+<!-- LOGIN -->
+<div id="telaSenha" class="tela oculto">
+  <div class="card">
+    <h3>Entrar</h3>
+    <div class="linha"><input id="senha" placeholder="Sua senha" autocapitalize="characters" autocomplete="off"></div>
+    <div class="linha"><button class="prim" id="salvarSenha" style="flex:1">Entrar</button></div>
+    <div id="msgSenha" class="erro"></div>
+  </div>
 </div>
 
-<div id="config" class="oculto">
-  <div class="linha"><input id="obra" placeholder="Nº do projeto (ex.: DACASUL2501427)" autocapitalize="characters"></div>
-  <div class="linha"><select id="wl"></select><button class="prim" id="iniciar">Iniciar</button></div>
+<!-- MINHAS OBRAS -->
+<div id="telaObras" class="tela oculto">
+  <div class="linha"><input id="busca" placeholder="Nº da obra (ex.: DMP/A.SUL.26.01257)" autocapitalize="characters"><button class="prim" id="abrirBusca">Abrir</button></div>
+  <div id="msgBusca" class="sub"></div>
+  <div id="avisoTecnico" class="card alerta oculto"></div>
+  <h3 style="margin:14px 2px 4px">Minhas obras para viabilizar <span id="nPend" class="pill"></span></h3>
+  <div id="listaPend"></div>
+  <h3 style="margin:14px 2px 4px">Feitas nos últimos 45 dias <span id="nFeitas" class="pill"></span></h3>
+  <div id="listaFeitas"></div>
+  <div class="linha"><button id="atualizar" class="peq">Atualizar lista</button><span id="msgObras" class="sub"></span></div>
 </div>
 
-<div id="camera" class="oculto">
+<!-- OBRA (viabilidade) -->
+<div id="telaObra" class="tela oculto">
+  <div class="linha"><button id="voltarObras" class="peq">‹ Obras</button><b id="tituloObra" style="flex:1;text-align:right"></b></div>
+  <div class="card" id="infoObra"></div>
+  <div class="card oculto" id="cardNova">
+    <h3>Obra nova – não está na CARTEIRA</h3>
+    <div class="sub">Será cadastrada na CARTEIRA quando você concluir.</div>
+    <div class="perg"><label class="t">Circuito <span class="obrig">*</span></label><input id="novaCircuito" autocapitalize="characters" placeholder="Ex.: PIP 0114"></div>
+    <div class="perg"><label class="t">Família da obra <span class="obrig">*</span></label><select id="novaFamilia"></select></div>
+  </div>
+  <div class="card">
+    <h3>1. Fotos por WL</h3>
+    <div id="resumoFotos" class="sub"></div>
+    <div class="linha"><button class="prim" id="abrirCamera" style="flex:1">Abrir câmera</button></div>
+  </div>
+  <div class="card">
+    <h3>2. Local da obra</h3>
+    <div id="localObra" class="sub">Ainda não marcado.</div>
+    <div class="linha"><button id="marcarLocal" style="flex:1">Marcar local da obra aqui</button></div>
+  </div>
+  <div class="card">
+    <h3>3. Checklist</h3>
+    <div id="checklist"></div>
+  </div>
+  <div class="card oculto" id="cardEmail">
+    <h3>4. E-mail de "de acordo"</h3>
+    <div class="sub">Monte agora; na base anexe o croqui alterado e envie.</div>
+    <div class="linha"><button id="abrirEmail" style="flex:1">Montar e-mail</button></div>
+  </div>
+  <div id="msgObra"></div>
+</div>
+
+<!-- E-MAIL -->
+<div id="telaEmail" class="tela oculto">
+  <div class="linha"><button id="voltarDoEmail" class="peq">‹ Obra</button><b style="flex:1;text-align:right">E-mail de "de acordo"</b></div>
+  <div class="card">
+    <div class="perg"><label class="t">Para quem</label><select id="emModelo"></select></div>
+    <div class="perg"><label class="t">PJ (se souber)</label><input id="emPJ" inputmode="numeric"></div>
+    <div class="perg"><label class="t">Assunto</label><input id="emAssunto"></div>
+    <div class="perg"><label class="t">Texto</label><textarea id="emCorpo" style="min-height:260px"></textarea></div>
+    <div class="sub" id="emPara"></div>
+  </div>
+  <div class="linha"><button class="prim" id="emAbrir" style="flex:1">Abrir no e-mail</button><button id="emCopiar" style="flex:1">Copiar texto</button></div>
+</div>
+
+<!-- CÂMERA -->
+<div id="telaCamera" class="oculto">
   <div class="linha" style="justify-content:space-between">
     <b id="titulo"></b><button id="sair">Voltar</button>
   </div>
+  <div class="linha"><select id="wl"></select></div>
   <video id="video" autoplay playsinline muted></video>
   <div id="gps" class="alerta">GPS: procurando sinal…</div>
   <div id="barra">
@@ -57,63 +140,76 @@
     <button id="disparo" disabled aria-label="Fotografar">foto</button>
     <button id="proxima">Próxima WL ›</button>
   </div>
+  <div id="status" class="alerta" style="padding:0 12px"></div>
+  <ul id="fila"></ul>
 </div>
 
-<div id="status" class="alerta"></div>
-<ul id="fila"></ul>
+<div id="barraFixa" class="oculto"><button class="amar" id="concluir">Concluir viabilidade</button></div>
+<div id="aviso" class="oculto"></div>
 <canvas id="tela" class="oculto"></canvas>
 <div id="flashTela"></div>
 
 <script>
 // Endereço do servidor (Apps Script). Não é segredo; a senha fica só no celular.
 var SERVIDOR = 'https://script.google.com/macros/s/AKfycbz8hmbLMHaEJj7Secv24elyApKVqVyBFqDzCiaI7iE1ckiFRSueBUvV5X5NlD265V-Y/exec';
-var MAX_WL = 40, LADO_MAX = 4000, PRECISAO_ALERTA = 30, QUALIDADE = 0.9;
+var MAX_WL = 40, LADO_MAX = 4000, QUALIDADE = 0.9;
 
 var stream = null, captura = null, pos = null, vigia = null, flashLigado = false;
 var enviando = false, db = null, enviadas = [];
+var INI = null;          // dados do servidor (config + obras), guardados no celular
+var OBRA = null;         // obra aberta: {obra, norm, dados (da CARTEIRA) ou null, nova}
+var RASC = null;         // rascunho da viabilidade da obra aberta
 var $ = function (id) { return document.getElementById(id); };
 function mostrar(id, sim) { $(id).classList.toggle('oculto', !sim); }
-
-for (var i = 1; i <= MAX_WL; i++) {
-  var o = document.createElement('option');
-  o.value = o.textContent = 'WL' + ('0' + i).slice(-2);
-  $('wl').appendChild(o);
-}
-
 function guardado(k, v) {
   try {
     if (v === undefined) return localStorage.getItem(k);
     if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v);
   } catch (e) { return null; }
 }
+function guardadoJ(k, v) { if (v === undefined) { try { return JSON.parse(guardado(k) || 'null'); } catch (e) { return null; } } guardado(k, v === null ? null : JSON.stringify(v)); }
 function dois(n) { return ('0' + n).slice(-2); }
-function dataHora(d) {
-  return dois(d.getDate()) + '/' + dois(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' +
-         dois(d.getHours()) + ':' + dois(d.getMinutes()) + ':' + dois(d.getSeconds());
-}
-function obraAtual() { return $('obra').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function dataHora(d) { return dois(d.getDate()) + '/' + dois(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + dois(d.getHours()) + ':' + dois(d.getMinutes()) + ':' + dois(d.getSeconds()); }
+function dataISO(d) { return d.getFullYear() + '-' + dois(d.getMonth() + 1) + '-' + dois(d.getDate()); }
+function br(iso) { if (!iso) return ''; var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+function normObra(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
+function aviso(t) { $('aviso').textContent = t; mostrar('aviso', true); clearTimeout(aviso.t); aviso.t = setTimeout(function () { mostrar('aviso', false); }, 3500); }
 
-// ---------- Fila guardada no celular (IndexedDB) ----------
+for (var i = 1; i <= MAX_WL; i++) { var o = document.createElement('option'); o.value = o.textContent = 'WL' + dois(i); $('wl').appendChild(o); }
+
+// ---------- Banco do celular (IndexedDB): fotos e visitas esperando sinal ----------
 function abrirBanco() {
   return new Promise(function (ok, falha) {
-    var req = indexedDB.open('viabilidade', 1);
-    req.onupgradeneeded = function () { req.result.createObjectStore('fila', { keyPath: 'idFoto' }); };
+    var req = indexedDB.open('viabilidade', 2);
+    req.onupgradeneeded = function () {
+      var b = req.result;
+      if (!b.objectStoreNames.contains('fila')) b.createObjectStore('fila', { keyPath: 'idFoto' });
+      if (!b.objectStoreNames.contains('visitas')) b.createObjectStore('visitas', { keyPath: 'idVisita' });
+    };
     req.onsuccess = function () { ok(req.result); };
     req.onerror = function () { falha(req.error); };
   });
 }
-function tx(modo, fn) {
+function tx(loja, modo, fn) {
   return new Promise(function (ok, falha) {
-    var t = db.transaction('fila', modo), s = t.objectStore('fila'), r = fn(s);
+    var t = db.transaction(loja, modo), s = t.objectStore(loja), r = fn(s);
     t.oncomplete = function () { ok(r && r.result); };
     t.onerror = function () { falha(t.error); };
   });
 }
-function filaTodos() { return tx('readonly', function (s) { return s.getAll(); }); }
-function filaPor(item) { return tx('readwrite', function (s) { s.put(item); }); }
-function filaTirar(id) { return tx('readwrite', function (s) { s.delete(id); }); }
+function todos(loja) { return tx(loja, 'readonly', function (s) { return s.getAll(); }); }
+function por(loja, item) { return tx(loja, 'readwrite', function (s) { s.put(item); }); }
+function tirar(loja, id) { return tx(loja, 'readwrite', function (s) { s.delete(id); }); }
 
-// ---------- Login do viabilizador ----------
+// ---------- Servidor ----------
+function chamar(corpo) {
+  corpo.token = corpo.token || guardado('token');
+  return fetch(SERVIDOR, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(corpo) })
+    .then(function (r) { return r.json(); });
+}
+
+// ---------- Login ----------
 $('salvarSenha').onclick = function () {
   var s = $('senha').value.trim().toUpperCase();
   if (!s) return;
@@ -122,262 +218,433 @@ $('salvarSenha').onclick = function () {
     if (r.ok) {
       guardado('token', s); guardado('nome', r.nome);
       $('senha').value = ''; $('msgSenha').textContent = '';
-      telaInicial(); enviarFila();
+      irObras(); carregarInicio(); enviarTudo();
     } else {
       $('msgSenha').textContent = r.erro === 'Senha inválida' ? 'Senha não cadastrada ou desativada.' : (r.erro || 'Senha não aceita.');
     }
-  }).catch(function () {
-    $('msgSenha').textContent = 'Sem sinal. O primeiro acesso precisa de internet.';
-  });
+  }).catch(function () { $('msgSenha').textContent = 'Sem sinal. O primeiro acesso precisa de internet.'; });
 };
 $('sairLogin').onclick = function () {
-  if (!confirm('Sair deste celular? As fotos que ainda não subiram continuam guardadas.')) return;
+  if (!confirm('Sair deste celular? O que ainda não subiu continua guardado.')) return;
   guardado('token', null); guardado('nome', null);
   fecharCamera(); telaInicial();
 };
 
+function telas(qual) {
+  ['telaSenha', 'telaObras', 'telaObra', 'telaEmail', 'telaCamera'].forEach(function (t) { mostrar(t, t === qual); });
+  mostrar('barraFixa', qual === 'telaObra');
+  mostrar('usuario', qual !== 'telaSenha' && qual !== 'telaCamera');
+  window.scrollTo(0, 0);
+}
 function telaInicial() {
-  var logado = !!guardado('token');
-  mostrar('telaSenha', !logado);
-  mostrar('usuario', logado);
-  mostrar('config', logado);
-  mostrar('camera', false);
-  $('nomeUsuario').textContent = logado ? 'Viabilizador: ' + (guardado('nome') || '') : '';
-  if (guardado('obra')) $('obra').value = guardado('obra');
+  if (!guardado('token')) { telas('telaSenha'); return; }
+  $('nomeUsuario').textContent = guardado('nome') || '';
+  irObras();
 }
 
+// ---------- Minhas obras ----------
+function carregarInicio() {
+  $('msgObras').textContent = 'Atualizando…';
+  return chamar({ acao: 'inicio' }).then(function (r) {
+    if (!r.ok) { if (r.erro === 'Senha inválida') return deslogar(); throw new Error(r.erro); }
+    r.recebido = Date.now();
+    INI = r; guardadoJ('inicio', r);
+    $('msgObras').textContent = 'Atualizado às ' + new Date().toTimeString().slice(0, 5);
+    desenharObras();
+  }).catch(function (e) {
+    $('msgObras').textContent = INI ? 'Sem sinal: mostrando a lista guardada.' : 'Sem sinal e sem lista guardada.';
+  });
+}
+function deslogar() {
+  guardado('token', null); guardado('nome', null); telaInicial();
+  $('msgSenha').textContent = 'Sua senha foi desativada ou trocada. Fale com a Secretaria Técnica.';
+}
+function irObras() { telas('telaObras'); desenharObras(); }
+function itemObra(o, feita) {
+  var d = el('div', 'card obraItem');
+  var t = el('div'); t.appendChild(el('b', '', o.obra)); d.appendChild(t);
+  d.appendChild(el('div', 'sub', [o.familia, o.circuito].filter(Boolean).join(' · ') || 'sem família/circuito'));
+  if (o.endereco) d.appendChild(el('div', 'sub', o.endereco));
+  var r = guardadoJ('rasc_' + normObra(o.obra)), loc = guardadoJ('concl_' + normObra(o.obra));
+  if (loc) d.appendChild(el('span', 'pill verde', 'concluída no celular ' + br(loc)));
+  else if (r) d.appendChild(el('span', 'pill amarela', 'em andamento'));
+  if (feita) { var v = new Date(o.dataViab + 'T12:00:00'); v.setDate(v.getDate() + 45); d.appendChild(el('span', 'pill', 'viabilidade ' + br(o.dataViab) + ' · Pré-APR até ' + br(dataISO(v)))); }
+  d.onclick = function () { abrirObra(o.obra, o); };
+  return d;
+}
+function desenharObras() {
+  if (!INI) INI = guardadoJ('inicio');
+  var lp = $('listaPend'), lf = $('listaFeitas'); lp.innerHTML = ''; lf.innerHTML = '';
+  if (!INI) { lp.appendChild(el('div', 'sub', 'Lista ainda não carregada.')); return; }
+  $('nPend').textContent = INI.obras.pendentes.length; $('nFeitas').textContent = INI.obras.feitas.length;
+  INI.obras.pendentes.forEach(function (o) { lp.appendChild(itemObra(o, false)); });
+  INI.obras.feitas.slice().reverse().forEach(function (o) { lf.appendChild(itemObra(o, true)); });
+  if (!INI.obras.pendentes.length) lp.appendChild(el('div', 'sub', 'Nenhuma obra pendente no seu nome na CARTEIRA. Use a busca acima.'));
+  var av = $('avisoTecnico');
+  av.textContent = '"' + INI.nome + '" não está na lista de técnicos de viabilidade da CARTEIRA. A lista "Minhas obras" fica vazia e o técnico não é gravado. Peça para a Secretaria acertar o nome.';
+  mostrar('avisoTecnico', INI.tecnicoNaLista === false);
+}
+$('atualizar').onclick = carregarInicio;
+$('abrirBusca').onclick = function () {
+  var n = $('busca').value.trim().toUpperCase();
+  if (!normObra(n)) return;
+  var achada = INI && INI.obras.pendentes.concat(INI.obras.feitas).filter(function (o) { return normObra(o.obra) === normObra(n); })[0];
+  if (achada) { abrirObra(achada.obra, achada); return; }
+  $('msgBusca').textContent = 'Procurando na CARTEIRA…';
+  chamar({ acao: 'obra', obra: n }).then(function (r) {
+    if (!r.ok) throw new Error(r.erro);
+    $('msgBusca').textContent = r.obra ? '' : 'Não está na CARTEIRA: será cadastrada como obra nova.';
+    abrirObra(r.obra ? r.obra.obra : n, r.obra);
+  }).catch(function () {
+    $('msgBusca').textContent = 'Sem sinal: abrindo sem os dados da CARTEIRA.';
+    abrirObra(n, undefined);
+  });
+};
+
+// ---------- Obra / viabilidade ----------
+// dados: objeto da CARTEIRA, null = não existe (obra nova), undefined = não deu para saber (sem sinal)
+function abrirObra(numero, dados) {
+  var norm = normObra(numero);
+  RASC = guardadoJ('rasc_' + norm) || { obra: numero, respostas: {}, local: null, circuito: '', familia: '', inicio: new Date().toISOString(),
+    idVisita: norm + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), dados: dados === undefined ? undefined : dados };
+  if (dados !== undefined) RASC.dados = dados;
+  OBRA = { obra: numero, norm: norm };
+  salvarRasc();
+  $('tituloObra').textContent = numero;
+  desenharInfo(); desenharChecklist(); desenharLocal(); resumoFotos();
+  $('msgObra').textContent = '';
+  telas('telaObra');
+}
+function salvarRasc() { if (OBRA) guardadoJ('rasc_' + OBRA.norm, RASC); }
+function desenharInfo() {
+  var d = RASC.dados, box = $('infoObra'); box.innerHTML = '';
+  if (d) {
+    box.appendChild(el('div', '', [d.familia, d.circuito].filter(Boolean).join(' · ')));
+    if (d.endereco) box.appendChild(el('div', 'sub', d.endereco));
+    if (d.dataViab) { var v = new Date(d.dataViab + 'T12:00:00'); v.setDate(v.getDate() + 45); box.appendChild(el('div', 'sub', 'Última viabilidade: ' + br(d.dataViab) + ' (Pré-APR até ' + br(dataISO(v)) + ')')); }
+    if (d.tecnico) box.appendChild(el('div', 'sub', 'Técnico na CARTEIRA: ' + d.tecnico));
+  } else if (d === null) {
+    box.appendChild(el('div', 'alerta', 'Obra não encontrada na CARTEIRA.'));
+  } else {
+    box.appendChild(el('div', 'alerta', 'Sem dados da CARTEIRA (aberta sem sinal). Se for obra nova, preencha circuito e família.'));
+  }
+  var precisaNova = !d;
+  mostrar('cardNova', precisaNova);
+  var sel = $('novaFamilia'); sel.innerHTML = '';
+  sel.appendChild(new Option('— escolha —', ''));
+  ((INI && INI.config.familias) || []).forEach(function (f) { sel.appendChild(new Option(f, f)); });
+  $('novaCircuito').value = RASC.circuito || ''; sel.value = RASC.familia || '';
+}
+$('novaCircuito').oninput = function () { RASC.circuito = this.value.toUpperCase(); salvarRasc(); };
+$('novaFamilia').onchange = function () { RASC.familia = this.value; salvarRasc(); };
+
+function condicaoOk(regra) {
+  if (!regra) return true;
+  var m = /^\s*([A-Z0-9_]+)\s*(=|<>)\s*(.+?)\s*$/i.exec(regra);
+  if (!m) return true;
+  var v = RASC.respostas[m[1].toUpperCase()];
+  var vs = Array.isArray(v) ? v : [v];
+  var tem = vs.some(function (x) { return String(x || '').toUpperCase() === m[3].toUpperCase(); });
+  return m[2] === '=' ? tem : (v !== undefined && v !== '' && !tem);
+}
+function desenharChecklist() {
+  var box = $('checklist'); box.innerHTML = '';
+  var itens = (INI && INI.config.checklist) || [];
+  if (!itens.length) { box.appendChild(el('div', 'alerta', 'Checklist não carregado. Abra a lista de obras com sinal uma vez.')); return; }
+  itens.forEach(function (q) {
+    if (!condicaoOk(q.mostrarSe)) return;
+    var p = el('div', 'perg'); var lb = el('label', 't', q.pergunta + ' ');
+    if (q.obrigatorio) lb.appendChild(el('span', 'obrig', '*'));
+    p.appendChild(lb);
+    var val = RASC.respostas[q.codigo];
+    if (q.tipo === 'SIM/NAO' || q.tipo === 'LISTA') {
+      var ops = q.tipo === 'SIM/NAO' ? ['Sim', 'Não'] : q.opcoes;
+      var w = el('div', 'opcs');
+      ops.forEach(function (op) {
+        var b = el('button', op === val ? 'sel' : '', op);
+        b.type = 'button';
+        b.onclick = function () { RASC.respostas[q.codigo] = op; salvarRasc(); desenharChecklist(); };
+        w.appendChild(b);
+      });
+      p.appendChild(w);
+    } else {
+      var t = el('textarea'); t.value = val || ''; t.rows = 2;
+      t.oninput = function () { RASC.respostas[q.codigo] = t.value; salvarRasc(); };
+      p.appendChild(t);
+    }
+    box.appendChild(p);
+  });
+  mostrar('cardEmail', String(RASC.respostas.ALTERAR_PROJETO || '').toUpperCase() === 'SIM');
+}
+function desenharLocal() {
+  var l = RASC.local;
+  $('localObra').textContent = l ? (l.lat.toFixed(6) + ', ' + l.lng.toFixed(6) + ' (±' + l.prec + ' m)' + (l.endereco ? ' · ' + l.endereco : '')) : 'Ainda não marcado. Fique no ponto principal da obra.';
+  $('localObra').className = l ? (l.prec > ((INI && INI.config.gpsAlerta) || 30) ? 'alerta' : 'ok') : 'sub';
+  $('marcarLocal').textContent = l ? 'Marcar de novo' : 'Marcar local da obra aqui';
+}
+$('marcarLocal').onclick = function () {
+  if (!navigator.geolocation) { aviso('Este navegador não tem GPS.'); return; }
+  $('localObra').textContent = 'Buscando GPS…'; $('localObra').className = 'alerta';
+  navigator.geolocation.getCurrentPosition(function (p) {
+    RASC.local = { lat: p.coords.latitude, lng: p.coords.longitude, prec: Math.round(p.coords.accuracy) };
+    salvarRasc(); desenharLocal();
+    chamar({ acao: 'endereco', lat: RASC.local.lat, lng: RASC.local.lng }).then(function (r) {
+      if (r.ok && RASC.local) { RASC.local.endereco = r.endereco; salvarRasc(); desenharLocal(); }
+    }).catch(function () {});
+  }, function (e) {
+    $('localObra').textContent = e.code === 1 ? 'Localização negada. Libere nas configurações do Chrome.' : 'Sem GPS agora. Tente de novo.';
+    $('localObra').className = 'erro';
+  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+};
+$('voltarObras').onclick = function () { irObras(); };
+
+function faltando() {
+  var f = [];
+  if (!RASC.dados) {
+    if (!RASC.circuito) f.push('circuito');
+    if (!RASC.familia) f.push('família');
+  }
+  ((INI && INI.config.checklist) || []).forEach(function (q) {
+    if (!q.obrigatorio || !condicaoOk(q.mostrarSe)) return;
+    var v = RASC.respostas[q.codigo];
+    if (v === undefined || String(v).trim() === '') f.push(q.pergunta);
+  });
+  return f;
+}
+$('concluir').onclick = function () {
+  if (!INI) { aviso('Abra a lista de obras com sinal uma vez antes.'); return; }
+  var f = faltando();
+  if (f.length) { $('msgObra').className = 'card erro'; $('msgObra').textContent = 'Falta responder: ' + f.join('; '); $('msgObra').scrollIntoView(); return; }
+  if (!RASC.local && !confirm('O local da obra não foi marcado. Concluir mesmo assim?')) return;
+  var agora = new Date();
+  var v = { idVisita: RASC.idVisita, obra: RASC.obra, respostas: RASC.respostas, local: RASC.local,
+    circuito: RASC.dados ? '' : RASC.circuito, familia: RASC.dados ? '' : RASC.familia,
+    inicio: RASC.inicio, fim: agora.toISOString(), dataVisita: dataISO(agora), criado: agora.getTime() };
+  por('visitas', v).then(function () {
+    guardado('concl_' + OBRA.norm, dataISO(agora));
+    guardado('rasc_' + OBRA.norm, null);
+    aviso('Viabilidade concluída. Sobe para a planilha quando houver sinal.');
+    irObras(); enviarTudo();
+  });
+};
+
+// ---------- E-mail de "de acordo" ----------
+function saudacao() { var h = new Date().getHours(); return h < 12 ? 'Bom dia' : (h < 18 ? 'Boa tarde' : 'Boa noite'); }
+function preencher(t) {
+  var r = RASC.respostas, d = RASC.dados || {};
+  var alt = String(r.ALTERACAO_DESC || '').trim();
+  var mapa = { SAUDACAO: saudacao(), ALTERACAO: alt || '[o que alterar]', MOTIVO: String(r.ALTERACAO_MOTIVO || '').trim() || '[motivo]',
+    PROJETO: RASC.obra, PJ: $('emPJ').value.trim() || '[PJ]', CIRCUITO: d.circuito || RASC.circuito || '[circuito]',
+    NOME: guardado('nome') || '', RESUMO: alt.length > 60 ? alt.slice(0, 57) + '…' : (alt || 'Alteração') };
+  return String(t || '').replace(/\{([A-Z]+)\}/g, function (x, k) { return k in mapa ? mapa[k] : x; });
+}
+function montarEmail() {
+  var ms = (INI && INI.config.modelos) || [], m = ms[$('emModelo').selectedIndex] || {};
+  $('emAssunto').value = preencher(m.assunto); $('emCorpo').value = preencher(m.corpo);
+  $('emPara').textContent = 'Para: ' + (m.para || '(sem destinatários no modelo)') + (m.cc ? ' · Cc: ' + m.cc : '');
+}
+$('abrirEmail').onclick = function () {
+  var sel = $('emModelo'); sel.innerHTML = '';
+  ((INI && INI.config.modelos) || []).forEach(function (m) { sel.appendChild(new Option(m.codigo.replace('DE_ACORDO_', '').replace('_', ' '), m.codigo)); });
+  montarEmail(); telas('telaEmail');
+};
+$('emModelo').onchange = montarEmail; $('emPJ').oninput = montarEmail;
+$('voltarDoEmail').onclick = function () { telas('telaObra'); };
+$('emAbrir').onclick = function () {
+  var m = (INI.config.modelos || [])[$('emModelo').selectedIndex] || {};
+  var lista = function (s) { return String(s || '').split(/[;,]/).map(function (x) { return x.trim(); }).filter(Boolean).join(','); };
+  location.href = 'mailto:' + lista(m.para) + '?cc=' + encodeURIComponent(lista(m.cc)) + '&subject=' + encodeURIComponent($('emAssunto').value) + '&body=' + encodeURIComponent($('emCorpo').value);
+};
+$('emCopiar').onclick = function () {
+  var t = 'Assunto: ' + $('emAssunto').value + '\n\n' + $('emCorpo').value;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { aviso('Texto copiado.'); }, function () {
+    $('emCorpo').select(); document.execCommand('copy'); aviso('Texto copiado.');
+  });
+};
+
 // ---------- Câmera ----------
-$('iniciar').onclick = function () {
-  if (!obraAtual()) { $('status').textContent = 'Digite o número do projeto.'; $('status').className = 'erro'; return; }
-  $('obra').value = obraAtual();
-  guardado('obra', obraAtual());
-  abrirCamera();
-};
-$('sair').onclick = fecharCamera;
-$('proxima').onclick = function () {
-  var s = $('wl');
-  if (s.selectedIndex < s.options.length - 1) s.selectedIndex++;
-  atualizarTitulo();
-};
+$('abrirCamera').onclick = function () { abrirCamera(); };
+$('sair').onclick = function () { fecharCamera(); telas('telaObra'); resumoFotos(); };
+$('proxima').onclick = function () { var s = $('wl'); if (s.selectedIndex < s.options.length - 1) s.selectedIndex++; atualizarTitulo(); };
+$('wl').onchange = atualizarTitulo;
 $('disparo').onclick = fotografar;
 $('flash').onclick = function () {
   flashLigado = !flashLigado;
   stream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: flashLigado }] }).catch(function () {});
   $('flash').textContent = flashLigado ? 'Flash ON' : 'Flash';
 };
-function atualizarTitulo() { $('titulo').textContent = obraAtual() + ' · ' + $('wl').value; }
+function atualizarTitulo() { $('titulo').textContent = OBRA.obra + ' · ' + $('wl').value; }
 
 function abrirCamera() {
-  navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } }
-  }).then(function (s) {
-    stream = s;
-    $('video').srcObject = s;
-    mostrar('config', false); mostrar('camera', true);
-    atualizarTitulo();
+  navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } } })
+  .then(function (s) {
+    stream = s; $('video').srcObject = s;
+    telas('telaCamera'); atualizarTitulo();
     var trilha = s.getVideoTracks()[0];
     captura = null;
     if (window.ImageCapture) { try { captura = new ImageCapture(trilha); } catch (e) {} }
     var cap = trilha.getCapabilities ? trilha.getCapabilities() : {};
     $('flash').style.visibility = cap.torch ? 'visible' : 'hidden';
-    iniciarGps();
-  }).catch(function (e) {
-    $('status').textContent = 'Câmera bloqueada (' + e.name + '). Libere a câmera para este site nas configurações do Chrome.';
-    $('status').className = 'erro';
-  });
+    iniciarGps(); desenharFila();
+  }).catch(function (e) { aviso('Câmera bloqueada (' + e.name + '). Libere a câmera para este site nas configurações do Chrome.'); });
 }
-
 function fecharCamera() {
   if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
   if (vigia !== null) navigator.geolocation.clearWatch(vigia);
   stream = null; vigia = null; pos = null; flashLigado = false;
   $('disparo').disabled = true;
-  mostrar('camera', false);
-  if (guardado('token')) mostrar('config', true);
 }
-
 function iniciarGps() {
   if (!navigator.geolocation) { gpsMsg('Este navegador não tem GPS.', 'erro'); return; }
+  var lim = (INI && INI.config.gpsAlerta) || 30;
   vigia = navigator.geolocation.watchPosition(function (p) {
-    pos = p;
-    var prec = Math.round(p.coords.accuracy);
-    gpsMsg('GPS ±' + prec + ' m · ' + p.coords.latitude.toFixed(6) + ', ' + p.coords.longitude.toFixed(6) +
-      (prec > PRECISAO_ALERTA ? ' (precisão baixa)' : ''), prec <= PRECISAO_ALERTA ? 'ok' : 'alerta');
+    pos = p; var prec = Math.round(p.coords.accuracy);
+    gpsMsg('GPS ±' + prec + ' m · ' + p.coords.latitude.toFixed(6) + ', ' + p.coords.longitude.toFixed(6) + (prec > lim ? ' (precisão baixa)' : ''), prec <= lim ? 'ok' : 'alerta');
     $('disparo').disabled = false;
-  }, function (e) {
-    gpsMsg('GPS: ' + (e.code === 1 ? 'permissão negada. Libere a localização.' : 'sem sinal (' + e.message + ')'), 'erro');
-  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  }, function (e) { gpsMsg('GPS: ' + (e.code === 1 ? 'permissão negada. Libere a localização.' : 'sem sinal (' + e.message + ')'), 'erro'); },
+  { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
 }
 function gpsMsg(t, c) { $('gps').textContent = t; $('gps').className = c; }
-
-// Foto crua (sem carimbo). O carimbo é feito quando houver sinal para buscar o endereço.
-function obterFotoCrua() {
-  if (captura) {
-    return captura.takePhoto().catch(function () { return quadroDoVideo(); });
-  }
-  return quadroDoVideo();
-}
+function obterFotoCrua() { return captura ? captura.takePhoto().catch(function () { return quadroDoVideo(); }) : quadroDoVideo(); }
 function quadroDoVideo() {
-  var v = $('video'), c = document.createElement('canvas');
-  c.width = v.videoWidth; c.height = v.videoHeight;
+  var v = $('video'), c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
   c.getContext('2d').drawImage(v, 0, 0);
   return new Promise(function (ok) { c.toBlob(ok, 'image/jpeg', 0.95); });
 }
-
 function fotografar() {
   if (!pos) return;
-  var p = pos, agora = new Date(), wl = $('wl').value, obra = obraAtual();
+  var p = pos, agora = new Date(), wl = $('wl').value;
   $('disparo').disabled = true;
   $('flashTela').style.opacity = 0.7; setTimeout(function () { $('flashTela').style.opacity = 0; }, 120);
   obterFotoCrua().then(function (blob) {
-    return filaPor({
-      idFoto: obra + '-' + agora.getTime() + '-' + Math.random().toString(36).slice(2, 7),
-      obra: obra, wl: wl, crua: blob, nome: guardado('nome') || '',
-      lat: p.coords.latitude, lng: p.coords.longitude, prec: Math.round(p.coords.accuracy),
-      horaCel: dataHora(agora), criado: agora.getTime()
+    return por('fila', {
+      idFoto: OBRA.norm + '-' + agora.getTime() + '-' + Math.random().toString(36).slice(2, 7),
+      obra: OBRA.norm, obraTexto: OBRA.obra, idVisita: RASC.idVisita, wl: wl, crua: blob, nome: guardado('nome') || '',
+      lat: p.coords.latitude, lng: p.coords.longitude, prec: Math.round(p.coords.accuracy), horaCel: dataHora(agora), criado: agora.getTime()
     });
-  }).then(function () {
-    $('disparo').disabled = false;
-    desenharFila(); enviarFila();
-  }).catch(function (e) {
-    $('status').textContent = 'Erro ao fotografar: ' + e; $('status').className = 'erro';
-    $('disparo').disabled = false;
-  });
+  }).then(function () { $('disparo').disabled = false; desenharFila(); enviarTudo(); })
+  .catch(function (e) { $('status').textContent = 'Erro ao fotografar: ' + e; $('status').className = 'erro'; $('disparo').disabled = false; });
 }
 
 // ---------- Carimbo ----------
 function quebrar(g, texto, largura) {
   var palavras = String(texto).split(' '), linhas = [], atual = '';
-  palavras.forEach(function (p) {
-    var teste = atual ? atual + ' ' + p : p;
-    if (g.measureText(teste).width > largura && atual) { linhas.push(atual); atual = p; } else atual = teste;
-  });
+  palavras.forEach(function (p) { var teste = atual ? atual + ' ' + p : p; if (g.measureText(teste).width > largura && atual) { linhas.push(atual); atual = p; } else atual = teste; });
   if (atual) linhas.push(atual);
   return linhas;
 }
-
 function carimbarFoto(it) {
   return createImageBitmap(it.crua || it.blob).then(function (img) {
     var esc = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
     var w = Math.round(img.width * esc), h = Math.round(img.height * esc);
     var c = $('tela'); c.width = w; c.height = h;
-    var g = c.getContext('2d');
-    g.drawImage(img, 0, 0, w, h);
+    var g = c.getContext('2d'); g.drawImage(img, 0, 0, w, h);
     var fonte = Math.max(18, Math.round(w / 38)), pad = Math.round(fonte * 0.6), alt = fonte * 1.3;
     g.font = 'bold ' + fonte + 'px Arial, sans-serif';
     var largura = w - pad * 2;
-    var linhas = [].concat(
-      quebrar(g, it.horaCel + '  ·  ' + it.nome, largura),
-      quebrar(g, it.endereco || 'Endereço não localizado', largura),
-      quebrar(g, it.obra + '  ·  ' + it.wl, largura)
-    );
+    var linhas = [].concat(quebrar(g, it.horaCel + '  ·  ' + it.nome, largura), quebrar(g, it.endereco || 'Endereço não localizado', largura), quebrar(g, (it.obraTexto || it.obra) + '  ·  ' + it.wl, largura));
     var pequena = Math.round(fonte * 0.75);
     var coord = it.lat.toFixed(6) + ', ' + it.lng.toFixed(6) + '  (±' + it.prec + ' m)';
     var caixa = linhas.length * alt + pequena * 1.4 + pad * 2;
-    g.fillStyle = 'rgba(0,0,0,0.55)';
-    g.fillRect(0, h - caixa, w, caixa);
-    g.fillStyle = '#ffffff';
-    g.textBaseline = 'top';
+    g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, h - caixa, w, caixa);
+    g.fillStyle = '#ffffff'; g.textBaseline = 'top';
     linhas.forEach(function (t, i) { g.fillText(t, pad, h - caixa + pad + i * alt); });
     g.font = pequena + 'px Arial, sans-serif';
     g.fillText(coord, pad, h - caixa + pad + linhas.length * alt);
     return new Promise(function (ok) { c.toBlob(ok, 'image/jpeg', QUALIDADE); });
   });
 }
+function paraBase64(blob) { return new Promise(function (ok) { var l = new FileReader(); l.onload = function () { ok(l.result.split(',')[1]); }; l.readAsDataURL(blob); }); }
 
-// ---------- Envio ----------
-function chamar(corpo) {
-  return fetch(SERVIDOR, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(corpo)
-  }).then(function (r) { return r.json(); });
-}
-function paraBase64(blob) {
-  return new Promise(function (ok) {
-    var l = new FileReader();
-    l.onload = function () { ok(l.result.split(',')[1]); };
-    l.readAsDataURL(blob);
+// ---------- Fila de envio ----------
+function resumoFotos() {
+  if (!db || !OBRA) return;
+  todos('fila').then(function (itens) {
+    var minhas = itens.filter(function (it) { return it.obra === OBRA.norm; }).length;
+    var subiram = enviadas.filter(function (n) { return n.indexOf(OBRA.norm + '_') === 0; }).length;
+    $('resumoFotos').textContent = (minhas ? minhas + ' foto(s) esperando sinal. ' : '') + (subiram ? subiram + ' enviada(s) nesta sessão.' : (minhas ? '' : 'Uma WL de cada vez, na ordem.'));
   });
 }
-
 function desenharFila() {
-  return filaTodos().then(function (itens) {
+  return todos('fila').then(function (itens) {
     var ul = $('fila'); ul.innerHTML = '';
     itens.sort(function (a, b) { return b.criado - a.criado; }).forEach(function (it) {
-      var li = document.createElement('li');
-      var est = it.erro ? it.erro : (it.endereco === undefined ? 'aguardando sinal (endereço e carimbo)' : 'aguardando envio');
-      li.innerHTML = '<span>' + it.wl + ' · ' + it.horaCel.slice(11) + '</span><span class="' + (it.erro ? 'erro' : 'alerta') + '">' + est + '</span>';
+      var li = el('li'); li.appendChild(el('span', '', it.wl + ' · ' + it.horaCel.slice(11)));
+      li.appendChild(el('span', it.erro ? 'erro' : 'alerta', it.erro ? it.erro : (it.endereco === undefined ? 'aguardando sinal (endereço e carimbo)' : 'aguardando envio')));
       ul.appendChild(li);
     });
-    enviadas.slice(-15).reverse().forEach(function (n) {
-      var li = document.createElement('li');
-      li.innerHTML = '<span>' + n + '</span><span class="ok">no Drive ✓</span>';
-      ul.appendChild(li);
-    });
+    enviadas.slice(-15).reverse().forEach(function (n) { var li = el('li'); li.appendChild(el('span', '', n)); li.appendChild(el('span', 'ok', 'no Drive ✓')); ul.appendChild(li); });
     var st = $('status');
     if (itens.length) { st.textContent = itens.length + ' foto(s) guardada(s) no celular, aguardando sinal.'; st.className = 'alerta'; }
     else { st.textContent = enviadas.length ? 'Todas as fotos enviadas.' : ''; st.className = 'ok'; }
+    atualizarSinc();
     return itens;
   });
 }
-
-// Uma foto: busca endereço (se ainda não tem), carimba e envia.
-function processar(it, token) {
+function atualizarSinc() {
+  if (!db) return;
+  Promise.all([todos('fila'), todos('visitas')]).then(function (r) {
+    var n = r[0].length + r[1].length;
+    $('sinc').textContent = n ? n + ' esperando sinal' : '';
+  });
+}
+function processarFoto(it) {
   var passo = Promise.resolve();
   if (it.endereco === undefined) {
-    passo = chamar({ acao: 'endereco', token: token, lat: it.lat, lng: it.lng }).then(function (r) {
+    passo = chamar({ acao: 'endereco', lat: it.lat, lng: it.lng }).then(function (r) {
       if (!r.ok) throw { servidor: r.erro };
-      it.endereco = r.endereco || '';
-      return filaPor(it);
+      it.endereco = r.endereco || ''; return por('fila', it);
     });
   }
-  return passo.then(function () { return carimbarFoto(it); })
-    .then(paraBase64)
-    .then(function (b64) {
-      return chamar({
-        acao: 'foto', token: token, obra: it.obra, wl: it.wl, base64: b64,
-        lat: it.lat, lng: it.lng, prec: it.prec, horaCel: it.horaCel, idFoto: it.idFoto, endereco: it.endereco
-      });
-    }).then(function (r) {
-      if (!r.ok) throw { servidor: r.erro };
-      enviadas.push(r.nome);
-      return filaTirar(it.idFoto);
-    });
+  return passo.then(function () { return carimbarFoto(it); }).then(paraBase64).then(function (b64) {
+    return chamar({ acao: 'foto', obra: it.obra, obraTexto: it.obraTexto, idVisita: it.idVisita, wl: it.wl, base64: b64,
+      lat: it.lat, lng: it.lng, prec: it.prec, horaCel: it.horaCel, idFoto: it.idFoto, endereco: it.endereco });
+  }).then(function (r) { if (!r.ok) throw { servidor: r.erro }; enviadas.push(r.nome); return tirar('fila', it.idFoto); });
 }
-
-function enviarFila() {
-  if (enviando || !db) return;
-  var token = guardado('token');
-  if (!token) return;
+function processarVisita(v) {
+  return chamar({ acao: 'visita', idVisita: v.idVisita, obra: v.obra, respostas: v.respostas, local: v.local, circuito: v.circuito,
+    familia: v.familia, inicio: v.inicio, fim: v.fim, dataVisita: v.dataVisita })
+  .then(function (r) {
+    if (!r.ok) throw { servidor: r.erro };
+    if (r.avisos && r.avisos.length) aviso(r.avisos.join(' '));
+    return tirar('visitas', v.idVisita);
+  });
+}
+// Fotos primeiro, depois visitas. Sem sinal: para e tenta depois.
+function enviarTudo() {
+  if (enviando || !db || !guardado('token')) return;
   enviando = true;
-  filaTodos().then(function (itens) {
-    itens.sort(function (a, b) { return a.criado - b.criado; });
-    return itens.reduce(function (cadeia, it) {
-      return cadeia.then(function (parar) {
-        if (parar) return true;
-        return processar(it, token).then(function () { desenharFila(); return false; }, function (e) {
-          if (e && e.servidor === 'Senha inválida') {
-            guardado('token', null); guardado('nome', null); telaInicial();
-            $('msgSenha').textContent = 'Sua senha foi desativada ou trocada. Fale com a Secretaria Técnica.';
+  function rodar(loja, fn) {
+    return todos(loja).then(function (itens) {
+      itens.sort(function (a, b) { return a.criado - b.criado; });
+      return itens.reduce(function (cadeia, it) {
+        return cadeia.then(function (parar) {
+          if (parar) return true;
+          return fn(it).then(function () { desenharFila(); return false; }, function (e) {
+            if (e && e.servidor === 'Senha inválida') { deslogar(); return true; }
+            if (e && e.servidor) { it.erro = 'erro: ' + e.servidor; return por(loja, it).then(function () { return false; }); }
             return true;
-          }
-          if (e && e.servidor) { it.erro = 'erro: ' + e.servidor; return filaPor(it).then(function () { return false; }); }
-          return true; // sem sinal: tenta mais tarde
+          });
         });
-      });
-    }, Promise.resolve(false));
-  }).then(function () {
-    enviando = false; desenharFila();
-  }, function () { enviando = false; });
+      }, Promise.resolve(false));
+    });
+  }
+  rodar('fila', processarFoto).then(function (parou) { return parou ? true : rodar('visitas', processarVisita); })
+  .then(function () { enviando = false; desenharFila(); resumoFotos(); if (guardado('token') && navigator.onLine) carregarInicioQuieto(); },
+        function () { enviando = false; });
 }
+var ultimaCarga = 0;
+function carregarInicioQuieto() { if (Date.now() - ultimaCarga > 120000) { ultimaCarga = Date.now(); carregarInicio(); } }
 
-window.addEventListener('online', enviarFila);
-setInterval(enviarFila, 30000);
+window.addEventListener('online', enviarTudo);
+setInterval(enviarTudo, 30000);
 
-abrirBanco().then(function (b) { db = b; telaInicial(); desenharFila(); enviarFila(); })
-  .catch(function (e) { $('status').textContent = 'Erro no armazenamento do celular: ' + e; $('status').className = 'erro'; });
+INI = guardadoJ('inicio');
+abrirBanco().then(function (b) {
+  db = b; telaInicial(); desenharFila();
+  if (guardado('token')) { carregarInicio(); ultimaCarga = Date.now(); }
+  enviarTudo();
+}).catch(function (e) { aviso('Erro no armazenamento do celular: ' + e); });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
