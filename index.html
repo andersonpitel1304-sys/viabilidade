@@ -457,17 +457,20 @@ $('concluir').onclick = function () {
 
 // ---------- E-mail de "de acordo" ----------
 function saudacao() { var h = new Date().getHours(); return h < 12 ? 'Bom dia' : (h < 18 ? 'Boa tarde' : 'Boa noite'); }
-function preencher(t) {
+function preencher(t, corpo) {
   var r = RASC.respostas, d = RASC.dados || {};
   var alt = String(r.ALTERACAO_DESC || '').trim();
   var mapa = { SAUDACAO: saudacao(), ALTERACAO: alt || '[o que alterar]', MOTIVO: String(r.ALTERACAO_MOTIVO || '').trim() || '[motivo]',
-    PROJETO: RASC.obra, PJ: $('emPJ').value.trim() || '[PJ]', CIRCUITO: d.circuito || RASC.circuito || '[circuito]',
+    PROJETO: RASC.obra, PJ: $('emPJ').value.trim(), CIRCUITO: d.circuito || RASC.circuito || '[circuito]',
     NOME: guardado('nome') || '', RESUMO: alt.length > 60 ? alt.slice(0, 57) + '…' : (alt || 'Alteração') };
-  return String(t || '').replace(/\{([A-Z]+)\}/g, function (x, k) { return k in mapa ? mapa[k] : x; });
+  var txt = String(t || '');
+  // PJ em branco: tira a linha inteira do PJ (antes saía "[PJ]" no e-mail para a Enel)
+  if (corpo && !$('emPJ').value.trim()) txt = txt.replace(/^[^\n]*\{PJ\}[^\n]*(\r?\n|$)/gm, '');
+  return txt.replace(/\{([A-Z]+)\}/g, function (x, k) { return k in mapa ? mapa[k] : x; });
 }
 function montarEmail() {
   var ms = (INI && INI.config.modelos) || [], m = ms[$('emModelo').selectedIndex] || {};
-  $('emAssunto').value = preencher(m.assunto); $('emCorpo').value = preencher(m.corpo);
+  $('emAssunto').value = preencher(m.assunto); $('emCorpo').value = preencher(m.corpo, true);
   $('emPara').textContent = 'Para: ' + (m.para || '(sem destinatários no modelo)') + (m.cc ? ' · Cc: ' + m.cc : '');
 }
 $('abrirEmail').onclick = function () {
@@ -493,9 +496,9 @@ $('emCopiar').onclick = function () {
 var CROQ = {};            // obra normalizada → chave do croqui guardado no celular
 var baixandoCroqui = {};  // obra → promessa em andamento
 var situacaoCroqui = {};  // obra → 'nenhum' | 'mesma' | 'novo' | 'sem sinal' | 'erro: …' (última consulta)
-var preBaixando = false;
+var preBaixando = false, indiceCroquis = null;
 function carregarIndiceCroquis() {
-  return todos('croquis').then(function (l) { CROQ = {}; l.forEach(function (c) { CROQ[c.obra] = c.chave; }); });
+  return indiceCroquis = todos('croquis').then(function (l) { CROQ = {}; l.forEach(function (c) { CROQ[c.obra] = c.chave; }); });
 }
 function b64ParaBlob(b64, tipo) {
   var s = atob(b64), n = s.length, a = new Uint8Array(n);
@@ -506,7 +509,8 @@ function kb(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ','
 // Pergunta ao servidor; só baixa se a chave (versão) mudou.
 function baixarCroqui(norm, obraTexto) {
   if (baixandoCroqui[norm]) return baixandoCroqui[norm];
-  var p = chamar({ acao: 'croqui', obra: obraTexto || norm, chave: CROQ[norm] || '' }).then(function (r) {
+  // espera saber quais croquis já estão no celular (senão baixaria de novo o que já tem)
+  var p = (indiceCroquis || Promise.resolve()).then(function () { return chamar({ acao: 'croqui', obra: obraTexto || norm, chave: CROQ[norm] || '' }); }).then(function (r) {
     if (!r.ok) { if (r.erro === 'Senha inválida') deslogar(); throw { servidor: r.erro }; }
     if (r.mesma) return 'mesma';
     if (!r.croqui) return 'nenhum';
@@ -545,6 +549,12 @@ $('atualizarCroqui').onclick = function () { desenharCroqui(true); };
 // Com sinal, ao carregar "Minhas obras": baixa os croquis das pendentes que mudaram. Um por vez.
 function preBaixarCroquis() {
   if (preBaixando || !db || !INI) return;
+  if (!indiceCroquis) carregarIndiceCroquis();
+  preBaixando = true;
+  indiceCroquis.then(function () { preBaixando = false; preBaixarCroquis2(); }, function () { preBaixando = false; });
+}
+function preBaixarCroquis2() {
+  if (preBaixando) return;
   var obras = INI.obras.pendentes.filter(function (o) { return o.croquiChave && CROQ[normObra(o.obra)] !== o.croquiChave; });
   preBaixando = true;
   obras.reduce(function (cadeia, o) {
