@@ -167,11 +167,12 @@
   <div class="linha"><input type="date" id="progData"><button id="carregarDia" class="peq">Ver turmas</button></div>
   <div class="linha"><input id="progObra" placeholder="Nº da obra" autocapitalize="characters"><button class="prim" id="carregarObraProg">Abrir</button></div>
   <div id="msgProg" class="sub"></div>
+  <div id="vemDoV2" class="card oculto" style="border-left:5px solid #FFC20E"></div>
   <div class="card oculto" id="cardObraProg"></div>
   <div id="alertasProg"></div>
   <div class="card oculto" id="cardTurmas">
     <h3>Turmas <span id="resumoTurmas" class="sub"></span></h3>
-    <div class="linha"><label class="sub" style="flex:1">% total a programar</label><input id="pctTotal" inputmode="decimal" style="flex:0 0 90px;text-align:right"><button id="dividir" class="peq">Dividir pelos pesos</button></div>
+    <div class="linha"><label class="sub" style="flex:1">% da obra a programar neste dia</label><input id="pctTotal" inputmode="decimal" style="flex:0 0 90px;text-align:right"><button id="dividir" class="peq">Dividir pelos pesos</button></div>
     <div class="sub">Papel: R responsável · S suplente · A acompanha. Turma ocupada vai na linha de sinergia.</div>
     <div id="listaTurmas"></div>
     <div id="somaTurmas" class="sub" style="margin-top:6px"></div>
@@ -313,7 +314,7 @@ $('salvarSenha').onclick = function () {
     if (r.ok) {
       guardado('token', s); guardado('nome', r.nome);
       $('senha').value = ''; $('msgSenha').textContent = '';
-      irObras(); carregarInicio(); enviarTudo();
+      irObras(); carregarInicio().then(function () { abrirProgDoV2(); }); enviarTudo();
     } else {
       $('msgSenha').textContent = r.erro === 'Senha inválida' ? 'Senha não cadastrada ou desativada.' : (r.erro || 'Senha não aceita.');
     }
@@ -601,9 +602,16 @@ var situacaoCroqui = {};  // obra → 'nenhum' | 'mesma' | 'novo' | 'sem sinal' 
 var preBaixando = false, indiceCroquis = null;
 
 // ---------- Programação (perfil Programador; só com sinal) ----------
-var PROG = { turno: 'D', dia: null, obra: null, sel: {} };   // sel[linha] = {pct, papel}
+var PROG = { turno: 'D', dia: null, obra: null, sel: {}, manual: false, pref: null };   // sel[linha] = {pct, papel}; pref = dados vindos do V2
 function pctTxt(f) { return (Math.round(f * 10000) / 100).toString().replace('.', ','); }
 function num(t) { var v = parseFloat(String(t || '').replace(',', '.')); return isNaN(v) ? 0 : v; }
+function nrmNome(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase(); }
+// "ALESSANDRO OLIMPIO" (grade) x "ALESSANDRO OLIMPIO DE JESUS (11)9..." (descritivo do V2)
+function encarregadoBate(grade, descr) {
+  var g = nrmNome(grade).split(' ').filter(Boolean), d = nrmNome(String(descr || '').split('(')[0]).split(' ').filter(Boolean);
+  return g.length > 0 && d.length > 0 && g[0] === d[0] && g.every(function (w) { return d.indexOf(w) >= 0; });
+}
+function somaDias(iso, n) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); if (!m) return ''; var d = new Date(+m[1], +m[2] - 1, +m[3] + n); return isNaN(d) ? '' : dataISO(d); }
 function proximoDia() { var d = new Date(); d.setDate(d.getDate() + 1); return dataISO(d); }
 function horarioPadrao() {
   $('progIni').value = PROG.turno === 'N' ? '23:00' : '10:30';
@@ -662,7 +670,20 @@ function carregarObraProg(nova) {
       PROG.dia.turmas.forEach(function (t) { if (t.linha === x.linha || t.linhaSinergia === x.linha) PROG.sel[t.linha] = { pct: pctTxt(x.pct), papel: 'A' }; });
     });
     if (nova) $('pctTotal').value = pctTxt(r.saldo + r.noDia.reduce(function (s, x) { return s + x.pct; }, 0));
+    if (nova) PROG.manual = false;
+    var pf = PROG.pref;
+    if (nova === true && pf && normObra(pf.obra) === normObra(n)) {
+      if (pf.m) { if (![].some.call($('progM').options, function (o) { return o.value === pf.m; })) $('progM').appendChild(new Option(pf.m, pf.m)); $('progM').value = pf.m; }
+      if (pf.q != null) $('progQ').value = pf.q;
+      if (pf.r != null) $('progR').value = pf.r;
+      if (!r.noDia.length) [['R', pf.resp], ['S', pf.supl]].forEach(function (x) {
+        if (!x[1]) return;
+        var t = PROG.dia.turmas.filter(function (t) { return encarregadoBate(t.enc, x[1]) && estadoTurma(t).livre && !PROG.sel[t.linha]; })[0];
+        if (t) PROG.sel[t.linha] = { pct: '', papel: x[0] };
+      });
+    }
     desenharObraProg(); desenharTurmas();
+    if (nova && !r.noDia.length && Object.keys(PROG.sel).length) dividir(true);
     mostrar('cardCampos', true);
   }).catch(function () { $('msgProg').textContent = 'Sem sinal. A programação precisa de internet.'; $('msgProg').className = 'erro'; });
 }
@@ -677,7 +698,16 @@ function desenharObraProg() {
   if (r.futuras.length) c.appendChild(el('div', 'sub', 'Outras datas: ' + r.futuras.map(function (x) { return br(x.data).slice(0, 5) + (x.turno === 'N' ? ' (noite)' : '') + ' ' + x.cod + ' ' + pctTxt(x.pct) + '%'; }).join(' · ')));
   mostrar('cardObraProg', true);
   var a = $('alertasProg'); a.innerHTML = '';
-  r.alertas.forEach(function (x) { a.appendChild(el('div', 'alertaP ' + x.nivel, x.msg)); });
+  alertasTodos().forEach(function (x) { a.appendChild(el('div', 'alertaP ' + x.nivel, x.msg)); });
+}
+function alertasTodos() {
+  var l = PROG.obra.alertas.slice(), pf = PROG.pref;
+  if (pf && normObra(pf.obra) === normObra(PROG.obra.obra.obra)) {
+    var v = somaDias(pf.apr, 45);
+    if (!v) l.push({ nivel: 'ALTO', msg: 'Descritivo do V2 sem data da vistoria (Pré-APR).' });
+    else if (v < PROG.dia.data) l.push({ nivel: 'ALTO', msg: 'Pré-APR do V2 vence em ' + br(v) + ', antes da data programada.' });
+  }
+  return l;
 }
 function estadoTurma(t) {
   var n = PROG.obra ? normObra(PROG.obra.obra.obra) : '';
@@ -705,10 +735,10 @@ function desenharTurmas() {
     ck.onchange = function () {
       if (ck.checked) { var n = Object.keys(PROG.sel).length; PROG.sel[t.linha] = { pct: '', papel: n === 0 ? 'R' : (n === 1 ? 'S' : 'A') }; }
       else delete PROG.sel[t.linha];
-      desenharTurmas();
+      if (!PROG.manual) dividir(true); else desenharTurmas();
     };
     pap.onchange = function () { PROG.sel[t.linha].papel = pap.value; };
-    pc.oninput = function () { PROG.sel[t.linha].pct = pc.value; somarTurmas(); };
+    pc.oninput = function () { PROG.sel[t.linha].pct = pc.value; PROG.manual = true; somarTurmas(); };
     d.appendChild(ck); d.appendChild(nome); d.appendChild(pap); d.appendChild(pc);
     l.appendChild(d);
   });
@@ -717,19 +747,24 @@ function desenharTurmas() {
 }
 function somarTurmas() {
   var soma = 0; Object.keys(PROG.sel).forEach(function (k) { soma += num(PROG.sel[k].pct); });
-  var t = 'Soma das turmas: ' + soma.toFixed(2).replace('.', ',') + '%';
+  var tot = num($('pctTotal').value), n = Object.keys(PROG.sel).length;
+  var t = 'Soma das turmas: ' + soma.toFixed(2).replace('.', ',') + '% de ' + tot.toFixed(2).replace('.', ',') + '% · ' + (PROG.manual ? 'divisão manual ("Dividir pelos pesos" volta ao automático)' : 'divisão automática pelos pesos');
+  if (n && Math.abs(soma - tot) > 0.005) t += ' · NÃO FECHA com o total';
   if (PROG.obra) {
     var jaNoDia = PROG.obra.noDia.reduce(function (s, x) { return s + x.pct; }, 0);
     var saldo = (PROG.obra.saldo + jaNoDia) * 100;
     if (soma > saldo + 0.005) t += ' · ACIMA do saldo (' + saldo.toFixed(2).replace('.', ',') + '%)';
   }
   $('somaTurmas').textContent = t;
-  $('somaTurmas').className = /ACIMA/.test(t) ? 'erro' : 'sub';
+  $('somaTurmas').className = /ACIMA|NÃO FECHA/.test(t) ? 'erro' : 'sub';
   return soma;
 }
-$('dividir').onclick = function () {
-  var ls = Object.keys(PROG.sel); if (!ls.length) { aviso('Marque as turmas primeiro.'); return; }
-  var total = num($('pctTotal').value); if (!(total > 0)) { aviso('Informe o % total.'); return; }
+$('dividir').onclick = function () { dividir(false); };
+$('pctTotal').oninput = function () { if (!PROG.manual) dividir(true); else somarTurmas(); };
+function dividir(quieto) {
+  PROG.manual = false;
+  var ls = Object.keys(PROG.sel); if (!ls.length) { desenharTurmas(); if (!quieto) aviso('Marque as turmas primeiro.'); return; }
+  var total = num($('pctTotal').value); if (!(total > 0)) { desenharTurmas(); if (!quieto) aviso('Informe o % total.'); return; }
   var pesos = ls.map(function (k) { var t = PROG.dia.turmas.filter(function (x) { return String(x.linha) === k; })[0]; return (t && t.peso) || 1; });
   var sp = pesos.reduce(function (a, b) { return a + b; }, 0), acum = 0;
   ls.forEach(function (k, i) {
@@ -737,15 +772,15 @@ $('dividir').onclick = function () {
     acum += v; PROG.sel[k].pct = v.toFixed(2).replace('.', ',');
   });
   desenharTurmas();
-};
+}
 $('gravarProg').onclick = function () {
   if (!PROG.obra || !PROG.dia) return;
   var itens = Object.keys(PROG.sel).map(function (k) { return { linha: Number(k), pct: num(PROG.sel[k].pct), papel: PROG.sel[k].papel }; }).filter(function (i) { return i.pct > 0; });
   if (!itens.length) { aviso('Marque ao menos uma turma com %.'); return; }
   if (!$('progM').value) { aviso('Escolha o tipo de intervenção.'); return; }
   if (!$('progIni').value || !$('progFim').value) { aviso('Informe os horários.'); return; }
-  var alertas = PROG.obra.alertas.map(function (a) { return '• ' + a.msg; });
-  if (/ACIMA/.test($('somaTurmas').textContent)) alertas.push('• ' + $('somaTurmas').textContent);
+  var alertas = alertasTodos().map(function (a) { return '• ' + a.msg; });
+  if (/ACIMA|NÃO FECHA/.test($('somaTurmas').textContent)) alertas.push('• ' + $('somaTurmas').textContent);
   var msg = 'Gravar ' + PROG.obra.obra.obra + ' em ' + br(PROG.dia.data) + ' (' + PROG.dia.aba + ') para ' + itens.length + ' turma(s)?';
   if (alertas.length) msg += '\n\nALERTAS:\n' + alertas.join('\n') + '\n\nSeguir mesmo assim?';
   if (!confirm(msg)) return;
@@ -761,6 +796,40 @@ $('gravarProg').onclick = function () {
     }).catch(function () { $('resProg').appendChild(el('div', 'erro', 'Sem sinal: nada foi confirmado. Confira a planilha antes de gravar de novo.')); })
     .then(function () { b.disabled = false; b.textContent = 'Gravar na planilha'; });
 };
+
+// ---------- Vindo do V2 (Pré-APR e Programação): #prog=<dados> ----------
+function lerPrefDoEndereco() {
+  var m = /[#&]prog=([A-Za-z0-9_-]+)/.exec(location.hash || '');
+  if (!m) return null;
+  try {
+    var b = m[1].replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '=';
+    var p = JSON.parse(decodeURIComponent(escape(atob(b))));
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    try { sessionStorage.setItem('progPref', JSON.stringify(p)); } catch (e) {}
+    return p;
+  } catch (e) { aviso('Não consegui ler os dados vindos do V2.'); return null; }
+}
+function prefGuardada() { try { return JSON.parse(sessionStorage.getItem('progPref') || 'null'); } catch (e) { return null; } }
+function abrirProgDoV2() {
+  var p = prefGuardada(); if (!p || !guardado('token')) return false;
+  if (INI && INI.programador === false) { aviso('Seu usuário não tem perfil Programador.'); try { sessionStorage.removeItem('progPref'); } catch (e) {} return false; }
+  try { sessionStorage.removeItem('progPref'); } catch (e) {}
+  PROG.pref = p; PROG.obra = null; PROG.sel = {}; PROG.manual = false;
+  telas('telaProg');
+  PROG.turno = p.turno === 'N' ? 'N' : 'D'; $('turnoD').classList.toggle('sel', PROG.turno === 'D'); $('turnoN').classList.toggle('sel', PROG.turno === 'N');
+  horarioPadrao();
+  if (p.ini) $('progIni').value = p.ini; if (p.fim) $('progFim').value = p.fim;
+  $('progData').value = p.data || proximoDia();
+  $('progObra').value = formatarObra(p.obra || '');
+  var v = $('vemDoV2'); v.innerHTML = '';
+  v.appendChild(el('b', '', 'Veio do V2: ')); v.appendChild(document.createTextNode(formatarObra(p.obra || '') + ' · ' + (p.m || '') + ' · ' + br(p.data || '')));
+  v.appendChild(el('div', 'sub', 'Tipo, equipamento a desligar, serviço, responsável e suplente já vieram do descritivo. Confira e grave.'));
+  mostrar('vemDoV2', true);
+  var pr = carregarDia(); if (pr && pr.then) pr.then(function () { if (PROG.dia) carregarObraProg(true); });
+  return true;
+}
+lerPrefDoEndereco();
+window.addEventListener('hashchange', function () { if (lerPrefDoEndereco()) abrirProgDoV2(); });
 
 function carregarIndiceCroquis() {
   return indiceCroquis = todos('croquis').then(function (l) { CROQ = {}; l.forEach(function (c) { CROQ[c.obra] = c.chave; }); });
@@ -1233,7 +1302,7 @@ INI = guardadoJ('inicio');
 abrirBanco().then(function (b) {
   db = b; telaInicial(); desenharFila();
   carregarIndiceCroquis().then(function () { if (!$('telaObras').classList.contains('oculto')) desenharObras(); });
-  if (guardado('token')) { carregarInicio(); ultimaCarga = Date.now(); }
+  if (guardado('token')) { var pi = carregarInicio(); ultimaCarga = Date.now(); if (prefGuardada()) pi.then(function () { abrirProgDoV2(); }); }
   enviarTudo();
 }).catch(function (e) { aviso('Erro no armazenamento do celular: ' + e); });
 
