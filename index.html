@@ -172,7 +172,7 @@
 <script>
 // Endereço do servidor (Apps Script). Não é segredo; a senha fica só no celular.
 var SERVIDOR = 'https://script.google.com/macros/s/AKfycbz8hmbLMHaEJj7Secv24elyApKVqVyBFqDzCiaI7iE1ckiFRSueBUvV5X5NlD265V-Y/exec';
-var MAX_WL = 40, LADO_MAX = 4000, QUALIDADE = 0.9;
+var MAX_WL = 40, LADO_MAX = 2560, QUALIDADE = 0.85; // 23/11: 4000 px/0,9 levava 20–40 s por foto; reduzido a pedido do Anderson
 
 var stream = null, captura = null, pos = null, vigia = null, flashLigado = false;
 var enviando = false, db = null, enviadas = [];
