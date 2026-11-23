@@ -1,5 +1,5 @@
 // Guarda a tela no celular para abrir mesmo sem sinal.
-var VERSAO = 'secretaria-v7';
+var VERSAO = 'secretaria-v8';
 var ARQUIVOS = ['./', 'index.html', 'manifest.webmanifest', 'icone-192.png', 'icone-512.png', 'pdf.min.js', 'pdf.worker.min.js'];
 // Leitor de PDF (pdf.js 3.11.174): não muda entre versões do app, então usa a cópia guardada primeiro.
 var FIXOS = /\/pdf(\.worker)?\.min\.js$/;
