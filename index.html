@@ -57,7 +57,7 @@
   #modos { display: flex; gap: 0; margin: 8px 0; }
   #modos button { flex: 1; border-radius: 0; }
   #modos button:first-child { border-radius: 8px 0 0 8px; } #modos button:last-child { border-radius: 0 8px 8px 0; }
-  #modos button.sel { background: #001A38; color: #fff; border-color: #001A38; }
+  #modosProg button.sel, #modos button.sel { background: #001A38; color: #fff; border-color: #001A38; }
   .ponto { border-left: 4px solid #FFC20E; }
   .ponto h3 { display: flex; justify-content: space-between; align-items: center; }
   /* croqui */
@@ -68,6 +68,18 @@
   #paginas { overflow: auto; padding: 6px; height: calc(100vh - 92px); -webkit-overflow-scrolling: touch; }
   #paginas canvas { display: block; margin: 0 auto 8px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
   #msgCroquiTela { padding: 10px 12px; }
+  button:disabled { opacity: .45; cursor: default; }
+  /* programação */
+  .turma { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eef1f5; }
+  .turma .nome { flex: 1; min-width: 0; font-size: 14px; }
+  .turma .nome b { display: block; font-size: 15px; }
+  .turma input[type=checkbox] { width: 24px; height: 24px; flex: 0 0 24px; }
+  .turma input.pct { flex: 0 0 74px; width: 74px; text-align: right; padding: 8px 6px; }
+  .turma select { flex: 0 0 56px; width: 56px; padding: 8px 4px; }
+  .turma.cheia { opacity: .5; }
+  .alertaP { border-left: 5px solid #c62828; background: #fdecec; padding: 8px 10px; border-radius: 6px; margin: 6px 0; font-size: 14px; }
+  .alertaP.MEDIO, .alertaP.MÉDIO { border-color: #e0a100; background: #fff7dd; }
+  .alertaP.BAIXO { border-color: #8a97a8; background: #f0f3f7; }
   #aviso { position: fixed; left: 12px; right: 12px; bottom: 76px; background: #001A38; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 15px; z-index: 9; }
 </style>
 </head>
@@ -87,6 +99,7 @@
 
 <!-- MINHAS OBRAS -->
 <div id="telaObras" class="tela oculto">
+  <div class="linha oculto" id="linhaProg"><button class="amar" id="irProg" style="flex:1">Programar obra</button></div>
   <div class="linha"><input id="busca" placeholder="Nº da obra (ex.: DMP/A.SUL.26.01257)" autocapitalize="characters"><button class="prim" id="abrirBusca">Abrir</button></div>
   <div id="msgBusca" class="sub"></div>
   <div id="avisoTecnico" class="card alerta oculto"></div>
@@ -148,6 +161,31 @@
 </div>
 
 <!-- E-MAIL -->
+<div id="telaProg" class="tela oculto">
+  <div class="linha"><button id="voltarDaProg" class="peq">‹ Obras</button><b style="flex:1;text-align:right">Programação</b></div>
+  <div id="modosProg" class="linha" style="gap:0"><button id="turnoD" class="sel" style="flex:1;border-radius:8px 0 0 8px">Diurno</button><button id="turnoN" style="flex:1;border-radius:0 8px 8px 0">Noturno</button></div>
+  <div class="linha"><input type="date" id="progData"><button id="carregarDia" class="peq">Ver turmas</button></div>
+  <div class="linha"><input id="progObra" placeholder="Nº da obra" autocapitalize="characters"><button class="prim" id="carregarObraProg">Abrir</button></div>
+  <div id="msgProg" class="sub"></div>
+  <div class="card oculto" id="cardObraProg"></div>
+  <div id="alertasProg"></div>
+  <div class="card oculto" id="cardTurmas">
+    <h3>Turmas <span id="resumoTurmas" class="sub"></span></h3>
+    <div class="linha"><label class="sub" style="flex:1">% total a programar</label><input id="pctTotal" inputmode="decimal" style="flex:0 0 90px;text-align:right"><button id="dividir" class="peq">Dividir pelos pesos</button></div>
+    <div class="sub">Papel: R responsável · S suplente · A acompanha. Turma ocupada vai na linha de sinergia.</div>
+    <div id="listaTurmas"></div>
+    <div id="somaTurmas" class="sub" style="margin-top:6px"></div>
+  </div>
+  <div class="card oculto" id="cardCampos">
+    <div class="perg"><label class="t">Tipo de intervenção <span class="obrig">*</span></label><select id="progM"></select></div>
+    <div class="perg"><label class="t">Equipamento e trecho a desligar</label><textarea id="progQ" rows="2"></textarea></div>
+    <div class="perg"><label class="t">Serviço a executar</label><textarea id="progR" rows="4"></textarea></div>
+    <div class="linha"><label class="sub">Início</label><input type="time" id="progIni"><label class="sub">Fim</label><input type="time" id="progFim"></div>
+    <div class="linha"><button class="amar" id="gravarProg" style="flex:1">Gravar na planilha</button></div>
+    <div id="resProg"></div>
+  </div>
+</div>
+
 <div id="telaEmail" class="tela oculto">
   <div class="linha"><button id="voltarDoEmail" class="peq">‹ Obra</button><b style="flex:1;text-align:right">E-mail de "de acordo"</b></div>
   <div class="card">
@@ -288,7 +326,7 @@ $('sairLogin').onclick = function () {
 };
 
 function telas(qual) {
-  ['telaSenha', 'telaObras', 'telaObra', 'telaEmail', 'telaCamera', 'telaCroqui'].forEach(function (t) { mostrar(t, t === qual); });
+  ['telaSenha', 'telaObras', 'telaObra', 'telaEmail', 'telaCamera', 'telaCroqui', 'telaProg'].forEach(function (t) { mostrar(t, t === qual); });
   mostrar('barraFixa', qual === 'telaObra');
   mostrar('usuario', qual !== 'telaSenha' && qual !== 'telaCamera' && qual !== 'telaCroqui');
   if (qual !== 'telaCroqui') fecharCroqui();
@@ -358,6 +396,7 @@ function desenharObras() {
   var av = $('avisoTecnico');
   av.textContent = '"' + INI.nome + '" não está na lista de técnicos de viabilidade da CARTEIRA. A lista "Minhas obras" fica vazia e o técnico não é gravado. Peça para a Secretaria acertar o nome.';
   mostrar('avisoTecnico', INI.tecnicoNaLista === false);
+  mostrar('linhaProg', !!INI.programador);
 }
 $('atualizar').onclick = carregarInicio;
 $('abrirBusca').onclick = function () {
@@ -560,6 +599,169 @@ var CROQ = {};            // obra normalizada → chave do croqui guardado no ce
 var baixandoCroqui = {};  // obra → promessa em andamento
 var situacaoCroqui = {};  // obra → 'nenhum' | 'mesma' | 'novo' | 'sem sinal' | 'erro: …' (última consulta)
 var preBaixando = false, indiceCroquis = null;
+
+// ---------- Programação (perfil Programador; só com sinal) ----------
+var PROG = { turno: 'D', dia: null, obra: null, sel: {} };   // sel[linha] = {pct, papel}
+function pctTxt(f) { return (Math.round(f * 10000) / 100).toString().replace('.', ','); }
+function num(t) { var v = parseFloat(String(t || '').replace(',', '.')); return isNaN(v) ? 0 : v; }
+function proximoDia() { var d = new Date(); d.setDate(d.getDate() + 1); return dataISO(d); }
+function horarioPadrao() {
+  $('progIni').value = PROG.turno === 'N' ? '23:00' : '10:30';
+  $('progFim').value = PROG.turno === 'N' ? '03:00' : '14:30';
+}
+$('irProg').onclick = function () {
+  telas('telaProg');
+  if (!$('progData').value) { $('progData').value = proximoDia(); horarioPadrao(); }
+  if (!PROG.dia) carregarDia();
+};
+$('voltarDaProg').onclick = function () { irObras(); };
+function escolherTurno(t) {
+  if (PROG.turno === t) return;
+  PROG.turno = t; $('turnoD').classList.toggle('sel', t === 'D'); $('turnoN').classList.toggle('sel', t === 'N');
+  horarioPadrao(); carregarDia();
+}
+$('turnoD').onclick = function () { escolherTurno('D'); };
+$('turnoN').onclick = function () { escolherTurno('N'); };
+$('carregarDia').onclick = function () { carregarDia(); };
+$('progData').onchange = function () { carregarDia(); };
+$('progObra').onkeydown = function (e) { if (e.key === 'Enter') carregarObraProg(true); };
+$('turnoD').classList.add('sel');
+
+function carregarDia(manter) {
+  var data = $('progData').value; if (!data) return;
+  PROG.dia = null; PROG.sel = {}; if (!manter) $('resProg').innerHTML = '';
+  $('msgProg').textContent = 'Buscando turmas de ' + br(data) + '…';
+  mostrar('cardTurmas', false);
+  return chamar({ acao: 'prog_dia', data: data, turno: PROG.turno }).then(function (r) {
+    if (!r.ok) { $('msgProg').textContent = r.erro; $('msgProg').className = 'erro'; return; }
+    PROG.dia = r; $('msgProg').className = 'sub';
+    var dt = new Date(data + 'T12:00:00');
+    $('msgProg').textContent = r.aba + ' · ' + br(data) + ' (' + ['domingo','segunda','terça','quarta','quinta','sexta','sábado'][dt.getDay()] + ')' +
+      (r.programadorNaLista ? '' : ' · ATENÇÃO: "' + r.programador + '" não está na lista de programadores da planilha; a gravação vai falhar.');
+    var sel = $('progM'), atual = sel.value; sel.innerHTML = ''; sel.appendChild(new Option('— escolha —', ''));
+    r.tiposIntervencao.forEach(function (t) { sel.appendChild(new Option(t, t)); });
+    if (atual) sel.value = atual;
+    if (PROG.obra) carregarObraProg(manter ? 'manter' : true); else desenharTurmas();
+  }).catch(function () { $('msgProg').textContent = 'Sem sinal. A programação precisa de internet.'; $('msgProg').className = 'erro'; });
+}
+
+$('carregarObraProg').onclick = function () { carregarObraProg(true); };
+function carregarObraProg(nova) {
+  var n = formatarObra($('progObra').value);
+  if (!normObra(n)) return;
+  if (!PROG.dia) { aviso('Carregue as turmas do dia primeiro.'); return; }
+  $('progObra').value = n;
+  if (nova) { PROG.sel = {}; if (nova !== 'manter') $('resProg').innerHTML = ''; }
+  $('msgProg').textContent = 'Buscando ' + n + '…';
+  return chamar({ acao: 'prog_obra', obra: n, data: PROG.dia.data, turno: PROG.turno }).then(function (r) {
+    if (!r.ok) { $('msgProg').textContent = r.erro; $('msgProg').className = 'erro'; return; }
+    $('msgProg').className = 'sub'; $('msgProg').textContent = PROG.dia.aba + ' · ' + br(PROG.dia.data);
+    PROG.obra = r;
+    // obra já programada neste dia: traz o % de cada turma
+    if (nova) r.noDia.forEach(function (x) {
+      PROG.dia.turmas.forEach(function (t) { if (t.linha === x.linha || t.linhaSinergia === x.linha) PROG.sel[t.linha] = { pct: pctTxt(x.pct), papel: 'A' }; });
+    });
+    if (nova) $('pctTotal').value = pctTxt(r.saldo + r.noDia.reduce(function (s, x) { return s + x.pct; }, 0));
+    desenharObraProg(); desenharTurmas();
+    mostrar('cardCampos', true);
+  }).catch(function () { $('msgProg').textContent = 'Sem sinal. A programação precisa de internet.'; $('msgProg').className = 'erro'; });
+}
+function desenharObraProg() {
+  var r = PROG.obra, o = r.obra, c = $('cardObraProg'); c.innerHTML = '';
+  c.appendChild(el('h3', '', o.obra));
+  c.appendChild(el('div', 'sub', [o.familia, o.circuito].filter(Boolean).join(' · ')));
+  if (o.endereco) c.appendChild(el('div', 'sub', o.endereco));
+  c.appendChild(el('div', 'sub', 'UPS orçado ' + (o.upsOrcado === '' ? '?' : String(o.upsOrcado).replace('.', ',')) + ' · executado ' + pctTxt(o.pctExec || 0) + '% · programado em outros dias ' + pctTxt(r.progFuturo) + '%'));
+  c.appendChild(el('div', '', 'Saldo para programar: ')).appendChild(el('b', '', pctTxt(r.saldo) + '%'));
+  if (o.dataViab) c.appendChild(el('div', 'sub', 'Viabilidade ' + br(o.dataViab) + (o.tecnico ? ' · ' + o.tecnico : '')));
+  if (r.futuras.length) c.appendChild(el('div', 'sub', 'Outras datas: ' + r.futuras.map(function (x) { return br(x.data).slice(0, 5) + (x.turno === 'N' ? ' (noite)' : '') + ' ' + x.cod + ' ' + pctTxt(x.pct) + '%'; }).join(' · ')));
+  mostrar('cardObraProg', true);
+  var a = $('alertasProg'); a.innerHTML = '';
+  r.alertas.forEach(function (x) { a.appendChild(el('div', 'alertaP ' + x.nivel, x.msg)); });
+}
+function estadoTurma(t) {
+  var n = PROG.obra ? normObra(PROG.obra.obra.obra) : '';
+  if (n && normObra(t.principal.obra) === n) return { txt: 'já tem esta obra', livre: true };
+  if (n && t.sinergia && normObra(t.sinergia.obra) === n) return { txt: 'já tem esta obra (sinergia)', livre: true };
+  if (!t.principal.obra) return { txt: 'livre', livre: true };
+  if (t.linhaSinergia && !t.sinergia.obra) return { txt: 'tem ' + t.principal.obra + ' → vai na sinergia', livre: true };
+  return { txt: 'cheia: ' + t.principal.obra + (t.sinergia && t.sinergia.obra ? ' + ' + t.sinergia.obra : ''), livre: false };
+}
+function desenharTurmas() {
+  var l = $('listaTurmas'); l.innerHTML = '';
+  if (!PROG.dia) return;
+  mostrar('cardTurmas', true);
+  var livres = 0;
+  PROG.dia.turmas.forEach(function (t) {
+    var e = estadoTurma(t); if (e.livre) livres++;
+    var d = el('div', 'turma' + (e.livre ? '' : ' cheia'));
+    var ck = document.createElement('input'); ck.type = 'checkbox'; ck.disabled = !e.livre || !PROG.obra; ck.checked = !!PROG.sel[t.linha];
+    var nome = el('div', 'nome'); nome.appendChild(el('b', '', t.cod + ' · ' + t.enc)); nome.appendChild(el('span', 'sub', (t.sup ? t.sup + ' · ' : '') + e.txt));
+    var pap = document.createElement('select'); ['R', 'S', 'A'].forEach(function (p) { pap.appendChild(new Option(p, p)); });
+    var pc = document.createElement('input'); pc.className = 'pct'; pc.inputMode = 'decimal'; pc.placeholder = '%';
+    var s = PROG.sel[t.linha];
+    pap.disabled = pc.disabled = !s;
+    if (s) { pap.value = s.papel; pc.value = s.pct; }
+    ck.onchange = function () {
+      if (ck.checked) { var n = Object.keys(PROG.sel).length; PROG.sel[t.linha] = { pct: '', papel: n === 0 ? 'R' : (n === 1 ? 'S' : 'A') }; }
+      else delete PROG.sel[t.linha];
+      desenharTurmas();
+    };
+    pap.onchange = function () { PROG.sel[t.linha].papel = pap.value; };
+    pc.oninput = function () { PROG.sel[t.linha].pct = pc.value; somarTurmas(); };
+    d.appendChild(ck); d.appendChild(nome); d.appendChild(pap); d.appendChild(pc);
+    l.appendChild(d);
+  });
+  $('resumoTurmas').textContent = PROG.dia.turmas.length + ' no dia · ' + livres + ' com vaga' + (PROG.obra ? '' : ' · abra a obra para marcar');
+  somarTurmas();
+}
+function somarTurmas() {
+  var soma = 0; Object.keys(PROG.sel).forEach(function (k) { soma += num(PROG.sel[k].pct); });
+  var t = 'Soma das turmas: ' + soma.toFixed(2).replace('.', ',') + '%';
+  if (PROG.obra) {
+    var jaNoDia = PROG.obra.noDia.reduce(function (s, x) { return s + x.pct; }, 0);
+    var saldo = (PROG.obra.saldo + jaNoDia) * 100;
+    if (soma > saldo + 0.005) t += ' · ACIMA do saldo (' + saldo.toFixed(2).replace('.', ',') + '%)';
+  }
+  $('somaTurmas').textContent = t;
+  $('somaTurmas').className = /ACIMA/.test(t) ? 'erro' : 'sub';
+  return soma;
+}
+$('dividir').onclick = function () {
+  var ls = Object.keys(PROG.sel); if (!ls.length) { aviso('Marque as turmas primeiro.'); return; }
+  var total = num($('pctTotal').value); if (!(total > 0)) { aviso('Informe o % total.'); return; }
+  var pesos = ls.map(function (k) { var t = PROG.dia.turmas.filter(function (x) { return String(x.linha) === k; })[0]; return (t && t.peso) || 1; });
+  var sp = pesos.reduce(function (a, b) { return a + b; }, 0), acum = 0;
+  ls.forEach(function (k, i) {
+    var v = i === ls.length - 1 ? Math.round((total - acum) * 100) / 100 : Math.round(total * pesos[i] / sp * 100) / 100;
+    acum += v; PROG.sel[k].pct = v.toFixed(2).replace('.', ',');
+  });
+  desenharTurmas();
+};
+$('gravarProg').onclick = function () {
+  if (!PROG.obra || !PROG.dia) return;
+  var itens = Object.keys(PROG.sel).map(function (k) { return { linha: Number(k), pct: num(PROG.sel[k].pct), papel: PROG.sel[k].papel }; }).filter(function (i) { return i.pct > 0; });
+  if (!itens.length) { aviso('Marque ao menos uma turma com %.'); return; }
+  if (!$('progM').value) { aviso('Escolha o tipo de intervenção.'); return; }
+  if (!$('progIni').value || !$('progFim').value) { aviso('Informe os horários.'); return; }
+  var alertas = PROG.obra.alertas.map(function (a) { return '• ' + a.msg; });
+  if (/ACIMA/.test($('somaTurmas').textContent)) alertas.push('• ' + $('somaTurmas').textContent);
+  var msg = 'Gravar ' + PROG.obra.obra.obra + ' em ' + br(PROG.dia.data) + ' (' + PROG.dia.aba + ') para ' + itens.length + ' turma(s)?';
+  if (alertas.length) msg += '\n\nALERTAS:\n' + alertas.join('\n') + '\n\nSeguir mesmo assim?';
+  if (!confirm(msg)) return;
+  var b = $('gravarProg'); b.disabled = true; b.textContent = 'Gravando…'; $('resProg').innerHTML = '';
+  chamar({ acao: 'prog_gravar', data: PROG.dia.data, turno: PROG.turno, obra: PROG.obra.obra.obra, itens: itens,
+           m: $('progM').value, q: $('progQ').value.trim(), r: $('progR').value.trim(), inicio: $('progIni').value, fim: $('progFim').value })
+    .then(function (r) {
+      var res = $('resProg');
+      (r.gravadas || []).forEach(function (g) { res.appendChild(el('div', g.ok ? 'ok' : 'erro', (g.ok ? '✓ ' : '✗ ') + g.cod + ' ' + g.enc + ' · ' + pctTxt(g.pct) + '% · linha ' + g.linha + (g.sinergia ? ' (sinergia)' : ''))); });
+      if (!r.ok) res.appendChild(el('div', 'erro', r.erro || 'Falhou.'));
+      else { res.appendChild(el('div', 'ok', 'Gravado na aba ' + r.aba + '.')); aviso('Programação gravada.'); }
+      return carregarDia(true);
+    }).catch(function () { $('resProg').appendChild(el('div', 'erro', 'Sem sinal: nada foi confirmado. Confira a planilha antes de gravar de novo.')); })
+    .then(function () { b.disabled = false; b.textContent = 'Gravar na planilha'; });
+};
+
 function carregarIndiceCroquis() {
   return indiceCroquis = todos('croquis').then(function (l) { CROQ = {}; l.forEach(function (c) { CROQ[c.obra] = c.chave; }); });
 }
@@ -753,6 +955,7 @@ function condicaoOkEm(resp, regra) {
   var v = resp[m[1].toUpperCase()], tem = String(v || '').toUpperCase() === m[3].toUpperCase();
   return m[2] === '=' ? tem : (v !== undefined && v !== '' && !tem);
 }
+function tituloPonto(p) { var r = rotuloPonto(p); return r === 'Ponto ' + p.n ? r : 'Ponto ' + p.n + ' · ' + r; }
 function rotuloPonto(p) { var r = p.respostas || {}; return [r.TIPO_PONTO, r.NUM_EQUIP].filter(Boolean).join(' ') || ('Ponto ' + p.n); }
 function desenharGerador() {
   if (!RASCG) return;
@@ -764,7 +967,7 @@ function desenharGerador() {
   var itens = (INI && INI.config.checklistGerador) || [];
   RASCG.pontos.forEach(function (p, idx) {
     var c = el('div', 'card ponto');
-    var h = el('h3', '', 'Ponto ' + p.n + ' · ' + rotuloPonto(p));
+    var h = el('h3', '', tituloPonto(p));
     if (RASCG.pontos.length > 1) { var x = el('button', 'peq', 'Remover'); x.type = 'button';
       x.onclick = function () { if (!confirm('Remover o ponto ' + p.n + '? As fotos já tiradas continuam guardadas.')) return; RASCG.pontos.splice(idx, 1); RASCG.pontos.forEach(function (q, i) { q.n = i + 1; }); salvarRascG(true); desenharGerador(); };
       h.appendChild(x); }
@@ -785,7 +988,7 @@ function desenharGerador() {
       } else {
         var t = el(q.codigo === 'NUM_EQUIP' ? 'input' : 'textarea'); t.value = val || ''; if (t.tagName === 'TEXTAREA') t.rows = 2;
         if (q.codigo === 'NUM_EQUIP') t.inputMode = 'numeric';
-        t.oninput = function () { p.respostas[q.codigo] = t.value; salvarRascG(true); h.firstChild.nodeValue = 'Ponto ' + p.n + ' · ' + rotuloPonto(p); };
+        t.oninput = function () { p.respostas[q.codigo] = t.value; salvarRascG(true); h.firstChild.nodeValue = tituloPonto(p); };
         pg.appendChild(t);
       }
       c.appendChild(pg);
