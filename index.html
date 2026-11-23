@@ -53,6 +53,13 @@
   #fila li { padding: 4px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; gap: 8px; }
   .oculto { display: none !important; }
   #flashTela { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  /* modo da visita */
+  #modos { display: flex; gap: 0; margin: 8px 0; }
+  #modos button { flex: 1; border-radius: 0; }
+  #modos button:first-child { border-radius: 8px 0 0 8px; } #modos button:last-child { border-radius: 0 8px 8px 0; }
+  #modos button.sel { background: #001A38; color: #fff; border-color: #001A38; }
+  .ponto { border-left: 4px solid #FFC20E; }
+  .ponto h3 { display: flex; justify-content: space-between; align-items: center; }
   /* croqui */
   #telaCroqui { padding: 0; background: #e9edf2; min-height: 100vh; }
   #barraCroqui { position: sticky; top: 0; z-index: 5; background: #001A38; color: #fff; display: flex; gap: 6px; align-items: center; padding: 8px 10px; }
@@ -87,6 +94,8 @@
   <div id="listaPend"></div>
   <h3 style="margin:14px 2px 4px">Feitas nos últimos 45 dias <span id="nFeitas" class="pill"></span></h3>
   <div id="listaFeitas"></div>
+  <h3 style="margin:14px 2px 4px">Visitas de gerador pendentes (Alpitel) <span id="nGer" class="pill"></span></h3>
+  <div id="listaGer"></div>
   <div class="linha"><button id="atualizar" class="peq">Atualizar lista</button><span id="msgObras" class="sub"></span></div>
 </div>
 
@@ -94,17 +103,21 @@
 <div id="telaObra" class="tela oculto">
   <div class="linha"><button id="voltarObras" class="peq">‹ Obras</button><b id="tituloObra" style="flex:1;text-align:right"></b></div>
   <div class="card" id="infoObra"></div>
+  <div id="modos"><button id="modoViab" class="sel">Viabilidade</button><button id="modoGer">Gerador</button></div>
+  <div id="blocoViab">
   <div class="card oculto" id="cardNova">
     <h3>Obra nova – não está na CARTEIRA</h3>
     <div class="sub">Será cadastrada na CARTEIRA quando você concluir.</div>
     <div class="perg"><label class="t">Circuito <span class="obrig">*</span></label><input id="novaCircuito" autocapitalize="characters" placeholder="Ex.: PIP 0114"></div>
     <div class="perg"><label class="t">Família da obra <span class="obrig">*</span></label><select id="novaFamilia"></select></div>
   </div>
+  </div>
   <div class="card" id="cardCroqui">
     <h3>Croqui</h3>
     <div id="estadoCroqui" class="sub">Procurando…</div>
     <div class="linha"><button class="prim" id="verCroqui" style="flex:1" disabled>Ver croqui</button><button id="atualizarCroqui" class="peq">Atualizar</button></div>
   </div>
+  <div id="blocoViab2">
   <div class="card">
     <h3>1. Fotos por WL</h3>
     <div id="resumoFotos" class="sub"></div>
@@ -123,6 +136,13 @@
     <h3>4. E-mail de "de acordo"</h3>
     <div class="sub">Monte agora; na base anexe o croqui alterado e envie.</div>
     <div class="linha"><button id="abrirEmail" style="flex:1">Montar e-mail</button></div>
+  </div>
+  </div>
+  <div id="blocoGer" class="oculto">
+    <div class="card"><h3>Visita de gerador (com a Essencial)</h3><div id="infoGer" class="sub"></div></div>
+    <div id="pontosGer"></div>
+    <div class="linha"><button id="addPonto" style="flex:1">+ Adicionar ponto</button></div>
+    <div class="card"><div class="perg"><label class="t">Observações da visita</label><textarea id="obsGer" rows="2"></textarea></div></div>
   </div>
   <div id="msgObra"></div>
 </div>
@@ -179,6 +199,9 @@ var enviando = false, db = null, enviadas = [];
 var INI = null;          // dados do servidor (config + obras), guardados no celular
 var OBRA = null;         // obra aberta: {obra, norm, dados (da CARTEIRA) ou null, nova}
 var RASC = null;         // rascunho da viabilidade da obra aberta
+var RASCG = null;        // rascunho da visita de gerador da obra aberta
+var MODO = 'VIAB';       // 'VIAB' ou 'GER' (tela da obra)
+var CAM = null;          // câmera de um ponto de gerador: {wl:'GER01', rotulo:'BF 57088'}; null = WL da viabilidade
 var $ = function (id) { return document.getElementById(id); };
 function mostrar(id, sim) { $(id).classList.toggle('oculto', !sim); }
 function guardado(k, v) {
@@ -202,7 +225,13 @@ function formatoOk(s) { return /^[A-Z]{3}\/[A-Z]\.[A-Z]{3}\.\d{2}\.\d{5}$/.test(
 function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
 function aviso(t) { $('aviso').textContent = t; mostrar('aviso', true); clearTimeout(aviso.t); aviso.t = setTimeout(function () { mostrar('aviso', false); }, 3500); }
 
-for (var i = 1; i <= MAX_WL; i++) { var o = document.createElement('option'); o.value = o.textContent = 'WL' + dois(i); $('wl').appendChild(o); }
+function preencherWL(lista) {
+  var sel = $('wl'), antes = sel.value; sel.innerHTML = '';
+  lista.forEach(function (v) { var o = document.createElement('option'); o.value = o.textContent = v; sel.appendChild(o); });
+  if (lista.indexOf(antes) >= 0) sel.value = antes;
+}
+var LISTA_WL = []; for (var i = 1; i <= MAX_WL; i++) LISTA_WL.push('WL' + dois(i));
+preencherWL(LISTA_WL);
 
 // ---------- Banco do celular (IndexedDB): fotos e visitas esperando sinal ----------
 function abrirBanco() {
@@ -312,6 +341,20 @@ function desenharObras() {
   INI.obras.pendentes.forEach(function (o) { lp.appendChild(itemObra(o, false)); });
   INI.obras.feitas.slice().reverse().forEach(function (o) { lf.appendChild(itemObra(o, true)); });
   if (!INI.obras.pendentes.length) lp.appendChild(el('div', 'sub', 'Nenhuma obra pendente no seu nome na CARTEIRA. Use a busca acima.'));
+  var lg = $('listaGer'); lg.innerHTML = '';
+  var ger = INI.obrasGerador || [];
+  $('nGer').textContent = ger.filter(function (o) { return !o.feita; }).length;
+  ger.forEach(function (o) {
+    var d = el('div', 'card obraItem'); var t = el('div'); t.appendChild(el('b', '', o.obra)); d.appendChild(t);
+    d.appendChild(el('div', 'sub', o.pontos.map(function (p) { return (p.tipo || '?') + ' ' + p.numero; }).join(' · ') + (o.circuito ? ' · ' + o.circuito : '')));
+    if (o.pontos[0] && o.pontos[0].endereco) d.appendChild(el('div', 'sub', o.pontos[0].endereco));
+    d.appendChild(el('span', 'pill' + (o.feita ? ' verde' : ' amarela'), o.feita ? 'visita de gerador já registrada' : o.status.toLowerCase()));
+    if (guardadoJ('rascg_' + o.norm)) { d.appendChild(document.createTextNode(' ')); d.appendChild(el('span', 'pill amarela', 'em andamento')); }
+    if (CROQ[o.norm]) { d.appendChild(document.createTextNode(' ')); d.appendChild(el('span', 'pill verde', 'croqui ✓')); }
+    d.onclick = function () { abrirPorNumero(o.obra, 'GER'); };
+    lg.appendChild(d);
+  });
+  if (!ger.length) lg.appendChild(el('div', 'sub', INI.avisoGerador || 'Nenhuma visita de gerador pendente para a Alpitel.'));
   var av = $('avisoTecnico');
   av.textContent = '"' + INI.nome + '" não está na lista de técnicos de viabilidade da CARTEIRA. A lista "Minhas obras" fica vazia e o técnico não é gravado. Peça para a Secretaria acertar o nome.';
   mostrar('avisoTecnico', INI.tecnicoNaLista === false);
@@ -336,17 +379,29 @@ $('abrirBusca').onclick = function () {
 
 // ---------- Obra / viabilidade ----------
 // dados: objeto da CARTEIRA, null = não existe (obra nova), undefined = não deu para saber (sem sinal)
-function abrirObra(numero, dados) {
+// Abre pelo número: usa a lista guardada; com sinal, pergunta à CARTEIRA; sem sinal, abre sem dados.
+function abrirPorNumero(n, modo) {
+  var achada = INI && INI.obras.pendentes.concat(INI.obras.feitas).filter(function (o) { return normObra(o.obra) === normObra(n); })[0];
+  if (achada) { abrirObra(achada.obra, achada, modo); return; }
+  chamar({ acao: 'obra', obra: n }).then(function (r) {
+    if (!r.ok) throw new Error(r.erro);
+    abrirObra(r.obra ? r.obra.obra : formatarObra(n), r.obra, modo);
+  }).catch(function () { abrirObra(formatarObra(n), undefined, modo); });
+}
+function abrirObra(numero, dados, modo) {
   var norm = normObra(numero);
+  var tinhaRasc = !!guardadoJ('rasc_' + norm);
   RASC = guardadoJ('rasc_' + norm) || { obra: numero, respostas: {}, local: null, circuito: '', familia: '', inicio: new Date().toISOString(),
     idVisita: norm + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), dados: dados === undefined ? undefined : dados };
   if (dados !== undefined) RASC.dados = dados;
   OBRA = { obra: numero, norm: norm };
-  salvarRasc();
+  if (tinhaRasc || (modo || 'VIAB') === 'VIAB') salvarRasc();
+  carregarRascG();
   $('tituloObra').textContent = numero;
   desenharInfo(); desenharChecklist(); desenharLocal(); resumoFotos();
   $('msgObra').textContent = '';
   telas('telaObra');
+  aplicarModo(modo || 'VIAB');
   desenharCroqui(true);
 }
 function salvarRasc() { if (OBRA) guardadoJ('rasc_' + OBRA.norm, RASC); }
@@ -446,6 +501,7 @@ function faltando() {
   return f;
 }
 $('concluir').onclick = function () {
+  if (MODO === 'GER') { concluirGerador(); return; }
   if (!INI) { aviso('Abra a lista de obras com sinal uma vez antes.'); return; }
   var f = faltando();
   if (f.length) { $('msgObra').className = 'card erro'; $('msgObra').textContent = 'Falta responder: ' + f.join('; '); $('msgObra').scrollIntoView(); return; }
@@ -664,9 +720,137 @@ function fecharCroqui() {
   var box = $('paginas'); if (box) box.innerHTML = '';
 }
 
+// ---------- Visita de gerador (Etapa 2) ----------
+// Pontos (BF/CF/RA/FF) visitados com a Essencial. Pré-preenchidos pela planilha Solicitação_Gerador (só leitura).
+function dadosGerador(norm) { return ((INI && INI.obrasGerador) || []).filter(function (o) { return o.norm === norm; })[0] || null; }
+function carregarRascG() {
+  var norm = OBRA.norm;
+  RASCG = guardadoJ('rascg_' + norm);
+  if (!RASCG) {
+    var g = dadosGerador(norm);
+    var pts = g && g.pontos.length ? g.pontos : [{}];
+    RASCG = { obra: OBRA.obra, idVisita: norm + '-G-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), inicio: new Date().toISOString(), obs: '',
+      pontos: pts.map(function (p, i) { return { n: i + 1, respostas: { TIPO_PONTO: p.tipo || '', NUM_EQUIP: p.numero || '' }, planilha: p.numero ? (p.tipoOriginal || p.tipo) + ' ' + p.numero + (p.endereco ? ' · ' + p.endereco : '') : '', local: null }; }) };
+  }
+}
+function salvarRascG(criar) { if (OBRA && RASCG && (criar || guardadoJ('rascg_' + OBRA.norm))) guardadoJ('rascg_' + OBRA.norm, RASCG); }
+function aplicarModo(m) {
+  MODO = m;
+  $('modoViab').classList.toggle('sel', m === 'VIAB'); $('modoGer').classList.toggle('sel', m === 'GER');
+  mostrar('blocoViab', m === 'VIAB'); mostrar('blocoViab2', m === 'VIAB'); mostrar('blocoGer', m === 'GER');
+  $('concluir').textContent = m === 'GER' ? 'Concluir visita de gerador' : 'Concluir viabilidade';
+  $('msgObra').textContent = '';
+  if (m === 'GER') desenharGerador();
+}
+$('modoViab').onclick = function () { aplicarModo('VIAB'); };
+$('modoGer').onclick = function () { aplicarModo('GER'); };
+$('obsGer').oninput = function () { RASCG.obs = this.value; salvarRascG(true); };
+$('addPonto').onclick = function () { RASCG.pontos.push({ n: RASCG.pontos.length + 1, respostas: {}, local: null, planilha: '' }); salvarRascG(true); desenharGerador(); };
+function condicaoOkEm(resp, regra) {
+  if (!regra) return true;
+  var m = /^\s*([A-Z0-9_]+)\s*(=|<>)\s*(.+?)\s*$/i.exec(regra);
+  if (!m) return true;
+  var v = resp[m[1].toUpperCase()], tem = String(v || '').toUpperCase() === m[3].toUpperCase();
+  return m[2] === '=' ? tem : (v !== undefined && v !== '' && !tem);
+}
+function rotuloPonto(p) { var r = p.respostas || {}; return [r.TIPO_PONTO, r.NUM_EQUIP].filter(Boolean).join(' ') || ('Ponto ' + p.n); }
+function desenharGerador() {
+  if (!RASCG) return;
+  var g = dadosGerador(OBRA.norm), info = $('infoGer');
+  info.textContent = g ? ('Solicitação: ' + g.status.toLowerCase() + (g.dataProgramacao ? ' · programação ' + g.dataProgramacao : '') + (g.circuito ? ' · ' + g.circuito : '') + (g.feita ? ' · JÁ EXISTE visita de gerador registrada para esta obra' : ''))
+    : 'Obra fora da lista de gerador pendente. Os pontos podem ser preenchidos à mão.';
+  $('obsGer').value = RASCG.obs || '';
+  var box = $('pontosGer'); box.innerHTML = '';
+  var itens = (INI && INI.config.checklistGerador) || [];
+  RASCG.pontos.forEach(function (p, idx) {
+    var c = el('div', 'card ponto');
+    var h = el('h3', '', 'Ponto ' + p.n + ' · ' + rotuloPonto(p));
+    if (RASCG.pontos.length > 1) { var x = el('button', 'peq', 'Remover'); x.type = 'button';
+      x.onclick = function () { if (!confirm('Remover o ponto ' + p.n + '? As fotos já tiradas continuam guardadas.')) return; RASCG.pontos.splice(idx, 1); RASCG.pontos.forEach(function (q, i) { q.n = i + 1; }); salvarRascG(true); desenharGerador(); };
+      h.appendChild(x); }
+    c.appendChild(h);
+    if (p.planilha) c.appendChild(el('div', 'sub', 'Na solicitação: ' + p.planilha));
+    if (!itens.length) c.appendChild(el('div', 'alerta', 'Perguntas de gerador não carregadas. Abra a lista de obras com sinal uma vez.'));
+    itens.forEach(function (q) {
+      if (!condicaoOkEm(p.respostas, q.mostrarSe)) return;
+      var pg = el('div', 'perg'); var lb = el('label', 't', q.pergunta + ' '); if (q.obrigatorio) lb.appendChild(el('span', 'obrig', '*')); pg.appendChild(lb);
+      var val = p.respostas[q.codigo];
+      if (q.tipo === 'SIM/NAO' || q.tipo === 'LISTA') {
+        var ops = (q.tipo === 'SIM/NAO' ? ['Sim', 'Não'] : q.opcoes).slice();
+        if (val && ops.indexOf(val) < 0) ops.push(val);
+        var w = el('div', 'opcs');
+        ops.forEach(function (op) { var b = el('button', op === val ? 'sel' : '', op); b.type = 'button';
+          b.onclick = function () { p.respostas[q.codigo] = op; salvarRascG(true); desenharGerador(); }; w.appendChild(b); });
+        pg.appendChild(w);
+      } else {
+        var t = el(q.codigo === 'NUM_EQUIP' ? 'input' : 'textarea'); t.value = val || ''; if (t.tagName === 'TEXTAREA') t.rows = 2;
+        if (q.codigo === 'NUM_EQUIP') t.inputMode = 'numeric';
+        t.oninput = function () { p.respostas[q.codigo] = t.value; salvarRascG(true); h.firstChild.nodeValue = 'Ponto ' + p.n + ' · ' + rotuloPonto(p); };
+        pg.appendChild(t);
+      }
+      c.appendChild(pg);
+    });
+    var l = p.local, lim = (INI && INI.config.gpsAlerta) || 30;
+    var loc = el('div', l ? (l.prec > lim ? 'alerta' : 'ok') : 'sub', l ? ('Local: ' + l.lat.toFixed(6) + ', ' + l.lng.toFixed(6) + ' (±' + l.prec + ' m)' + (l.endereco ? ' · ' + l.endereco : '')) : 'Local do ponto ainda não marcado.');
+    c.appendChild(loc);
+    var fotos = el('div', 'sub', ''); c.appendChild(fotos);
+    var lin = el('div', 'linha');
+    var bl = el('button', '', l ? 'Marcar local de novo' : 'Marcar local do ponto'); bl.type = 'button'; bl.style.flex = '1';
+    bl.onclick = function () { marcarLocalPonto(p, loc); };
+    var bf = el('button', 'prim', 'Fotos do ponto'); bf.type = 'button'; bf.style.flex = '1';
+    bf.onclick = function () { CAM = { wl: 'GER' + dois(p.n), rotulo: rotuloPonto(p) }; preencherWL([CAM.wl]); mostrar('proxima', false); salvarRascG(true); abrirCamera(); };
+    lin.appendChild(bl); lin.appendChild(bf); c.appendChild(lin);
+    box.appendChild(c);
+    contarFotosPonto(p, fotos);
+  });
+}
+function contarFotosPonto(p, alvo) {
+  if (!db) return;
+  var wl = 'GER' + dois(p.n), pref = OBRA.norm + '_' + wl + '_';
+  todos('fila').then(function (itens) {
+    var esp = itens.filter(function (it) { return it.obra === OBRA.norm && it.wl === wl; }).length;
+    var env = enviadas.filter(function (n) { return n.indexOf(pref) === 0; }).length;
+    alvo.textContent = (esp || env) ? ('Fotos: ' + (esp ? esp + ' esperando sinal' : '') + (esp && env ? ' · ' : '') + (env ? env + ' enviada(s) nesta sessão' : '')) : 'Nenhuma foto deste ponto nesta sessão.';
+  });
+}
+function marcarLocalPonto(p, alvo) {
+  if (!navigator.geolocation) { aviso('Este navegador não tem GPS.'); return; }
+  alvo.textContent = 'Buscando GPS…'; alvo.className = 'alerta';
+  navigator.geolocation.getCurrentPosition(function (g) {
+    p.local = { lat: g.coords.latitude, lng: g.coords.longitude, prec: Math.round(g.coords.accuracy) };
+    salvarRascG(true); desenharGerador();
+    chamar({ acao: 'endereco', lat: p.local.lat, lng: p.local.lng }).then(function (r) {
+      if (r.ok && p.local) { p.local.endereco = r.endereco; salvarRascG(true); if (MODO === 'GER') desenharGerador(); }
+    }).catch(function () {});
+  }, function (e) {
+    alvo.textContent = e.code === 1 ? 'Localização negada. Libere nas configurações do Chrome.' : 'Sem GPS agora. Tente de novo.'; alvo.className = 'erro';
+  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+}
+function concluirGerador() {
+  if (!INI) { aviso('Abra a lista de obras com sinal uma vez antes.'); return; }
+  var itens = INI.config.checklistGerador || [], falta = [], semLocal = [];
+  RASCG.pontos.forEach(function (p) {
+    itens.forEach(function (q) {
+      if (!q.obrigatorio || !condicaoOkEm(p.respostas, q.mostrarSe)) return;
+      var v = p.respostas[q.codigo]; if (v === undefined || String(v).trim() === '') falta.push('Ponto ' + p.n + ': ' + q.pergunta);
+    });
+    if (!p.local) semLocal.push(p.n);
+  });
+  if (falta.length) { $('msgObra').className = 'card erro'; $('msgObra').textContent = 'Falta responder: ' + falta.join('; '); $('msgObra').scrollIntoView(); return; }
+  if (semLocal.length && !confirm('Local não marcado no(s) ponto(s) ' + semLocal.join(', ') + '. Concluir mesmo assim?')) return;
+  var agora = new Date();
+  var v = { tipo: 'GERADOR', idVisita: RASCG.idVisita, obra: RASCG.obra, pontos: RASCG.pontos.map(function (p) { return { n: p.n, respostas: p.respostas, local: p.local }; }),
+    obs: RASCG.obs || '', inicio: RASCG.inicio, fim: agora.toISOString(), dataVisita: dataISO(agora), criado: agora.getTime() };
+  por('visitas', v).then(function () {
+    guardado('rascg_' + OBRA.norm, null);
+    aviso('Visita de gerador concluída. Sobe para a planilha quando houver sinal.');
+    irObras(); enviarTudo();
+  });
+}
+
 // ---------- Câmera ----------
-$('abrirCamera').onclick = function () { abrirCamera(); };
-$('sair').onclick = function () { fecharCamera(); telas('telaObra'); resumoFotos(); };
+$('abrirCamera').onclick = function () { CAM = null; preencherWL(LISTA_WL); mostrar('proxima', true); abrirCamera(); };
+$('sair').onclick = function () { fecharCamera(); telas('telaObra'); resumoFotos(); if (MODO === 'GER') desenharGerador(); };
 $('proxima').onclick = function () { var s = $('wl'); if (s.selectedIndex < s.options.length - 1) s.selectedIndex++; atualizarTitulo(); };
 $('wl').onchange = atualizarTitulo;
 $('disparo').onclick = fotografar;
@@ -675,7 +859,7 @@ $('flash').onclick = function () {
   stream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: flashLigado }] }).catch(function () {});
   $('flash').textContent = flashLigado ? 'Flash ON' : 'Flash';
 };
-function atualizarTitulo() { $('titulo').textContent = OBRA.obra + ' · ' + $('wl').value; }
+function atualizarTitulo() { $('titulo').textContent = OBRA.obra + ' · ' + $('wl').value + (CAM && CAM.rotulo ? ' · ' + CAM.rotulo : ''); }
 
 function abrirCamera() {
   navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } } })
@@ -721,7 +905,8 @@ function fotografar() {
   obterFotoCrua().then(function (blob) {
     return por('fila', {
       idFoto: OBRA.norm + '-' + agora.getTime() + '-' + Math.random().toString(36).slice(2, 7),
-      obra: OBRA.norm, obraTexto: OBRA.obra, idVisita: RASC.idVisita, wl: wl, crua: blob, nome: guardado('nome') || '',
+      obra: OBRA.norm, obraTexto: OBRA.obra, idVisita: CAM ? RASCG.idVisita : RASC.idVisita, wl: wl, crua: blob, nome: guardado('nome') || '',
+      tipoVisita: CAM ? 'GERADOR' : 'VIABILIDADE', rotulo: CAM ? CAM.rotulo : '',
       lat: p.coords.latitude, lng: p.coords.longitude, prec: Math.round(p.coords.accuracy), horaCel: dataHora(agora), criado: agora.getTime()
     });
   }).then(function () { $('disparo').disabled = false; desenharFila(); enviarTudo(); })
@@ -744,7 +929,7 @@ function carimbarFoto(it) {
     var fonte = Math.max(18, Math.round(w / 38)), pad = Math.round(fonte * 0.6), alt = fonte * 1.3;
     g.font = 'bold ' + fonte + 'px Arial, sans-serif';
     var largura = w - pad * 2;
-    var linhas = [].concat(quebrar(g, it.horaCel + '  ·  ' + it.nome, largura), quebrar(g, it.endereco || 'Endereço não localizado', largura), quebrar(g, (it.obraTexto || it.obra) + '  ·  ' + it.wl, largura));
+    var linhas = [].concat(quebrar(g, it.horaCel + '  ·  ' + it.nome, largura), quebrar(g, it.endereco || 'Endereço não localizado', largura), quebrar(g, (it.obraTexto || it.obra) + '  ·  ' + it.wl + (it.rotulo ? '  ·  ' + it.rotulo : ''), largura));
     var pequena = Math.round(fonte * 0.75);
     var coord = it.lat.toFixed(6) + ', ' + it.lng.toFixed(6) + '  (±' + it.prec + ' m)';
     var caixa = linhas.length * alt + pequena * 1.4 + pad * 2;
@@ -800,11 +985,11 @@ function processarFoto(it) {
   }
   return passo.then(function () { return carimbarFoto(it); }).then(paraBase64).then(function (b64) {
     return chamar({ acao: 'foto', obra: it.obra, obraTexto: it.obraTexto, idVisita: it.idVisita, wl: it.wl, base64: b64,
-      lat: it.lat, lng: it.lng, prec: it.prec, horaCel: it.horaCel, idFoto: it.idFoto, endereco: it.endereco });
+      lat: it.lat, lng: it.lng, prec: it.prec, horaCel: it.horaCel, idFoto: it.idFoto, endereco: it.endereco, tipoVisita: it.tipoVisita || 'VIABILIDADE' });
   }).then(function (r) { if (!r.ok) throw { servidor: r.erro }; enviadas.push(r.nome); return tirar('fila', it.idFoto); });
 }
 function processarVisita(v) {
-  return chamar({ acao: 'visita', idVisita: v.idVisita, obra: v.obra, respostas: v.respostas, local: v.local, circuito: v.circuito,
+  return chamar({ acao: 'visita', tipo: v.tipo || 'VIABILIDADE', pontos: v.pontos, obs: v.obs, idVisita: v.idVisita, obra: v.obra, respostas: v.respostas, local: v.local, circuito: v.circuito,
     familia: v.familia, inicio: v.inicio, fim: v.fim, dataVisita: v.dataVisita })
   .then(function (r) {
     if (!r.ok) throw { servidor: r.erro };
