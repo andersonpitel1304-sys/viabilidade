@@ -81,6 +81,14 @@
   .alertaP { border-left: 5px solid #c62828; background: #fdecec; padding: 8px 10px; border-radius: 6px; margin: 6px 0; font-size: 14px; }
   .alertaP.MEDIO, .alertaP.MÉDIO { border-color: #e0a100; background: #fff7dd; }
   .alertaP.BAIXO { border-color: #8a97a8; background: #f0f3f7; }
+  /* painel do viabilizador */
+  #painel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+  .tile { background: #fff; border: 1px solid #dde3ea; border-radius: 10px; padding: 8px 4px; text-align: center; cursor: pointer; }
+  .tile b { display: block; font-size: 26px; color: #001A38; line-height: 1.1; }
+  .tile span { font-size: 11px; color: #556; }
+  .tile.foco { border: 2px solid #FFC20E; background: #fffbea; }
+  #barraMeta { height: 10px; background: #e8edf3; border-radius: 6px; overflow: hidden; }
+  #barraMeta div { height: 100%; background: #16884A; width: 0; transition: width .4s; }
   #aviso { position: fixed; left: 12px; right: 12px; bottom: 76px; background: #001A38; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 15px; z-index: 9; }
 </style>
 </head>
@@ -104,6 +112,18 @@
   <div class="linha"><input id="busca" placeholder="Nº da obra (ex.: DMP/A.SUL.26.01257)" autocapitalize="characters"><button class="prim" id="abrirBusca">Abrir</button></div>
   <div id="msgBusca" class="sub"></div>
   <div id="avisoTecnico" class="card alerta oculto"></div>
+  <div id="cardPainel" class="oculto">
+    <div id="painel">
+      <div class="tile foco" id="tPend"><b id="pPend">0</b><span>a viabilizar</span></div>
+      <div class="tile" id="tMes"><b id="pMes">0</b><span>feitas no mês</span></div>
+      <div class="tile" id="tTot"><b id="pTot">0</b><span>total feitas</span></div>
+      <div class="tile" id="tUpsMes"><b id="pUpsMes">0</b><span>UPS no mês</span></div>
+      <div class="tile" id="tUpsTot"><b id="pUpsTot">0</b><span>UPS total</span></div>
+      <div class="tile" id="tSemUps"><b id="pSemUps">0</b><span>do mês sem UPS lançada</span></div>
+    </div>
+    <div id="barraMeta"><div></div></div>
+    <div id="textoMeta" class="sub" style="margin-top:4px"></div>
+  </div>
   <h3 style="margin:14px 2px 4px">Minhas obras para viabilizar <span id="nPend" class="pill"></span></h3>
   <div id="listaPend"></div>
   <h3 style="margin:14px 2px 4px">Feitas nos últimos 45 dias <span id="nFeitas" class="pill"></span></h3>
@@ -378,6 +398,14 @@ function itemObra(o, feita) {
   else if (r) d.appendChild(el('span', 'pill amarela', 'em andamento'));
   var cq = CROQ[normObra(o.obra)];
   if (cq) { d.appendChild(document.createTextNode(' ')); d.appendChild(el('span', 'pill' + (o.croquiChave && o.croquiChave !== cq ? ' amarela' : ' verde'), o.croquiChave && o.croquiChave !== cq ? 'croqui desatualizado' : 'croqui ✓')); }
+  if (!feita && !loc) {
+    if (o.dataProg) {
+      var dias = Math.round((new Date(o.dataProg + 'T12:00:00') - new Date(dataISO(new Date()) + 'T12:00:00')) / 864e5);
+      d.appendChild(document.createTextNode(' '));
+      d.appendChild(el('span', 'pill' + (dias <= 7 ? ' amarela' : ''), (dias < 0 ? 'programação já passou: ' : 'programada para ') + br(o.dataProg) + (dias >= 0 && dias <= 7 ? ' (em ' + dias + ' dia' + (dias === 1 ? '' : 's') + ')' : '')));
+    }
+  }
+  if (feita) { d.appendChild(document.createTextNode(' ')); d.appendChild(el('span', 'pill' + (typeof o.upsViab === 'number' && o.upsViab ? ' verde' : ' amarela'), typeof o.upsViab === 'number' && o.upsViab ? 'UPS ' + o.upsViab.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'UPS não lançada')); d.appendChild(document.createTextNode(' ')); }
   if (feita) { var v = new Date(o.dataViab + 'T12:00:00'); v.setDate(v.getDate() + 45); d.appendChild(el('span', 'pill', 'viabilidade ' + br(o.dataViab) + ' · Pré-APR até ' + br(dataISO(v)))); }
   d.onclick = function () { abrirObra(o.obra, o); };
   return d;
@@ -387,6 +415,7 @@ function desenharObras() {
   var lp = $('listaPend'), lf = $('listaFeitas'); lp.innerHTML = ''; lf.innerHTML = '';
   if (!INI) { lp.appendChild(el('div', 'sub', 'Lista ainda não carregada.')); return; }
   $('nPend').textContent = INI.obras.pendentes.length; $('nFeitas').textContent = INI.obras.feitas.length;
+  desenharPainel();
   INI.obras.pendentes.forEach(function (o) { lp.appendChild(itemObra(o, false)); });
   INI.obras.feitas.slice().reverse().forEach(function (o) { lf.appendChild(itemObra(o, true)); });
   if (!INI.obras.pendentes.length) lp.appendChild(el('div', 'sub', 'Nenhuma obra pendente no seu nome na CARTEIRA. Use a busca acima.'));
@@ -409,6 +438,26 @@ function desenharObras() {
   mostrar('avisoTecnico', INI.tecnicoNaLista === false);
   mostrar('linhaProg', !!INI.programador);
 }
+// Painel do viabilizador: a viabilizar × feitas (concluídas no celular e ainda sem sinal já contam como feitas)
+function desenharPainel() {
+  var c = INI.obras.contagem;
+  if (!c) { mostrar('cardPainel', false); return; }
+  var noCel = INI.obras.pendentes.filter(function (o) { return guardadoJ('concl_' + normObra(o.obra)); }).length;
+  var pend = INI.obras.pendentes.length - noCel, mes = c.mes + noCel;
+  var ups = function (v) { return (Math.round((v || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  $('pPend').textContent = pend; $('pMes').textContent = mes; $('pTot').textContent = c.total + noCel;
+  $('pUpsMes').textContent = ups(c.upsMes); $('pUpsTot').textContent = ups(c.upsTotal); $('pSemUps').textContent = (c.semUpsMes || 0) + noCel;
+  $('tSemUps').classList.toggle('foco', !!((c.semUpsMes || 0) + noCel));
+  var pct = pend + mes ? Math.round(mes * 100 / (pend + mes)) : 100;
+  $('barraMeta').firstChild.style.width = pct + '%';
+  $('textoMeta').textContent = (pend ? 'Neste mês: ' + mes + ' feita(s) de ' + (pend + mes) + ' (' + pct + '%). Faltam ' + pend + '.' : 'Demanda zerada! Nenhuma obra pendente no seu nome.') +
+    (noCel ? ' ' + noCel + ' concluída(s) no celular esperando sinal.' : '') +
+    ((c.semUpsMes || 0) + noCel ? ' A UPS é lançada pela Secretaria na CARTEIRA: obra sem UPS ainda não soma.' : '');
+  mostrar('cardPainel', true);
+}
+function rolarPara(id) { var e = $(id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+$('tPend').onclick = function () { rolarPara('listaPend'); };
+$('tMes').onclick = $('tTot').onclick = $('tUpsMes').onclick = $('tUpsTot').onclick = $('tSemUps').onclick = function () { rolarPara('listaFeitas'); };
 $('atualizar').onclick = carregarInicio;
 $('abrirBusca').onclick = function () {
   var n = $('busca').value.trim().toUpperCase();
