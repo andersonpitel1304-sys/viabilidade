@@ -193,6 +193,12 @@ function dataHora(d) { return dois(d.getDate()) + '/' + dois(d.getMonth() + 1) +
 function dataISO(d) { return d.getFullYear() + '-' + dois(d.getMonth() + 1) + '-' + dois(d.getDate()); }
 function br(iso) { if (!iso) return ''; var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
 function normObra(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+// "dmpasul2601257" → "DMP/A.SUL.26.01257" (formato da Enel; a ponte acha a região pelo formato). Não reconhecido: devolve como veio.
+function formatarObra(s) {
+  var m = /^([A-Z]{3})([A-Z])([A-Z]{3})(\d{2})(\d{5})$/.exec(normObra(s));
+  return m ? m[1] + '/' + m[2] + '.' + m[3] + '.' + m[4] + '.' + m[5] : String(s || '').trim().toUpperCase();
+}
+function formatoOk(s) { return /^[A-Z]{3}\/[A-Z]\.[A-Z]{3}\.\d{2}\.\d{5}$/.test(formatarObra(s)); }
 function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
 function aviso(t) { $('aviso').textContent = t; mostrar('aviso', true); clearTimeout(aviso.t); aviso.t = setTimeout(function () { mostrar('aviso', false); }, 3500); }
 
@@ -319,11 +325,12 @@ $('abrirBusca').onclick = function () {
   $('msgBusca').textContent = 'Procurando na CARTEIRA…';
   chamar({ acao: 'obra', obra: n }).then(function (r) {
     if (!r.ok) throw new Error(r.erro);
+    if (!r.obra && !formatoOk(n) && !confirm('O número "' + n + '" não está no formato da Enel (ex.: DMP/A.SUL.26.01257). Cadastrar assim mesmo?')) { $('msgBusca').textContent = 'Confira o número da obra.'; return; }
     $('msgBusca').textContent = r.obra ? '' : 'Não está na CARTEIRA: será cadastrada como obra nova.';
-    abrirObra(r.obra ? r.obra.obra : n, r.obra);
+    abrirObra(r.obra ? r.obra.obra : formatarObra(n), r.obra);
   }).catch(function () {
     $('msgBusca').textContent = 'Sem sinal: abrindo sem os dados da CARTEIRA.';
-    abrirObra(n, undefined);
+    abrirObra(formatarObra(n), undefined);
   });
 };
 
