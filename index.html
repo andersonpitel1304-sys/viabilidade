@@ -49,6 +49,10 @@
   #telaCamera button { background: #333; color: #fff; border-color: #444; }
   #disparo { width: 84px; height: 84px; border-radius: 50% !important; border: 6px solid #fff !important; background: #d33 !important; font-size: 0; }
   #disparo:disabled { background: #555 !important; }
+  #zoomBar { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 12px 0; }
+  #zoomBar button { width: 52px; font-size: 22px; padding: 4px 0; }
+  #zoomTxt { min-width: 56px; text-align: center; font-weight: bold; }
+  #video { touch-action: none; }
   #barra { display: flex; justify-content: space-around; align-items: center; padding: 10px; }
   #fila { list-style: none; margin: 0; padding: 0 12px 20px; font-size: 14px; }
   #fila li { padding: 4px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; gap: 8px; }
@@ -243,6 +247,7 @@
   <div class="linha"><select id="wl"></select></div>
   <video id="video" autoplay playsinline muted></video>
   <div id="gps" class="alerta">GPS: procurando sinal…</div>
+  <div id="zoomBar" class="oculto"><button id="zoomMenosCam" aria-label="Afastar">−</button><span id="zoomTxt">1,0×</span><button id="zoomMaisCam" aria-label="Aproximar">+</button></div>
   <div id="barra">
     <button id="flash" style="visibility:hidden">Flash</button>
     <button id="disparo" disabled aria-label="Fotografar">foto</button>
@@ -1249,7 +1254,7 @@ $('flash').onclick = function () {
 function atualizarTitulo() { $('titulo').textContent = OBRA.obra + ' · ' + $('wl').value + (CAM && CAM.rotulo ? ' · ' + CAM.rotulo : ''); }
 
 function abrirCamera() {
-  navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } } })
+  navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 }, zoom: true } })
   .then(function (s) {
     stream = s; $('video').srcObject = s;
     telas('telaCamera'); atualizarTitulo();
@@ -1258,13 +1263,40 @@ function abrirCamera() {
     if (window.ImageCapture) { try { captura = new ImageCapture(trilha); } catch (e) {} }
     var cap = trilha.getCapabilities ? trilha.getCapabilities() : {};
     $('flash').style.visibility = cap.torch ? 'visible' : 'hidden';
+    prepararZoom(trilha, cap);
     iniciarGps(); desenharFila();
   }).catch(function (e) { aviso('Câmera bloqueada (' + e.name + '). Libere a câmera para este site nas configurações do Chrome.'); });
 }
+// ---------- Zoom da câmera (Chrome Android) ----------
+// Abre sempre no zoom mínimo (alguns celulares abriam já aproximados) e permite + / − ou pinça no vídeo.
+var ZOOM_CAM = null;   // {trilha, min, max, passo, valor}
+function prepararZoom(trilha, cap) {
+  ZOOM_CAM = null; mostrar('zoomBar', false);
+  if (!cap || !cap.zoom || !(cap.zoom.max > cap.zoom.min)) return;
+  ZOOM_CAM = { trilha: trilha, min: cap.zoom.min, max: Math.min(cap.zoom.max, cap.zoom.min * 8), passo: cap.zoom.step || 0.1, valor: cap.zoom.min };
+  aplicarZoom(cap.zoom.min);
+  mostrar('zoomBar', true);
+}
+function aplicarZoom(v) {
+  if (!ZOOM_CAM) return;
+  v = Math.max(ZOOM_CAM.min, Math.min(ZOOM_CAM.max, Math.round(v / ZOOM_CAM.passo) * ZOOM_CAM.passo));
+  ZOOM_CAM.valor = v;
+  $('zoomTxt').textContent = (v / ZOOM_CAM.min).toFixed(1).replace('.', ',') + '×';
+  ZOOM_CAM.trilha.applyConstraints({ advanced: [{ zoom: v }] }).catch(function () {});
+}
+$('zoomMaisCam').onclick = function () { if (ZOOM_CAM) aplicarZoom(ZOOM_CAM.valor * 1.25); };
+$('zoomMenosCam').onclick = function () { if (ZOOM_CAM) aplicarZoom(ZOOM_CAM.valor / 1.25); };
+(function () {   // pinça com dois dedos no vídeo
+  var ini = null;
+  function dist(t) { var dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY; return Math.sqrt(dx * dx + dy * dy); }
+  $('video').addEventListener('touchstart', function (e) { if (e.touches.length === 2 && ZOOM_CAM) ini = { d: dist(e.touches), z: ZOOM_CAM.valor }; }, { passive: true });
+  $('video').addEventListener('touchmove', function (e) { if (ini && e.touches.length === 2) { e.preventDefault(); aplicarZoom(ini.z * dist(e.touches) / ini.d); } }, { passive: false });
+  $('video').addEventListener('touchend', function (e) { if (e.touches.length < 2) ini = null; }, { passive: true });
+})();
 function fecharCamera() {
   if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
   if (vigia !== null) navigator.geolocation.clearWatch(vigia);
-  stream = null; vigia = null; pos = null; flashLigado = false;
+  stream = null; vigia = null; pos = null; flashLigado = false; ZOOM_CAM = null;
   $('disparo').disabled = true;
 }
 function iniciarGps() {
@@ -1278,7 +1310,7 @@ function iniciarGps() {
   { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
 }
 function gpsMsg(t, c) { $('gps').textContent = t; $('gps').className = c; }
-function obterFotoCrua() { return captura ? captura.takePhoto().catch(function () { return quadroDoVideo(); }) : quadroDoVideo(); }
+function obterFotoCrua() { if (ZOOM_CAM && ZOOM_CAM.valor > ZOOM_CAM.min + 1e-6) return quadroDoVideo(); return captura ? captura.takePhoto().catch(function () { return quadroDoVideo(); }) : quadroDoVideo(); }
 function quadroDoVideo() {
   var v = $('video'), c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
   c.getContext('2d').drawImage(v, 0, 0);
